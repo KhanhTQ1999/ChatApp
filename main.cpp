@@ -4,7 +4,6 @@
 #include <memory>
 
 #include "utils/Utils.h"
-#include "core/NetworkManager.h"
 #include "model/ChatModel.h"
 #include "viewmodel/ChatViewModel.h"
 #include "view/CLIChatView.h"
@@ -48,8 +47,7 @@ int main(int argc, char* argv[]) {
     }
 
     //Initialize components
-    NetworkManager network;
-    ChatModel model(network);
+    ChatModel model;
     ChatViewModel viewModel(model);
 
     std::unique_ptr<IChatView> chatView;

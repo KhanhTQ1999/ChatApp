@@ -1,10 +1,9 @@
 #include "model/ChatModel.h"
 
-ChatModel::ChatModel(NetworkManager& networkManager) : networkManager_(networkManager) {
+ChatModel::ChatModel() {
     //TODO: Initialization if necessary
 }
 
-ChatModel::~ChatModel()
-{
+ChatModel::~ChatModel() {
     //TODO: Cleanup if necessary
 }

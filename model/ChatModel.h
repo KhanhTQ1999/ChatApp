@@ -1,19 +1,21 @@
 #ifndef CHATMODEL_H
 #define CHATMODEL_H
 
-#include "core/NetworkManager.h"
+#include "core/Client.h"
+#include "core/Server.h"
 
 class ChatModel
 {
 public:
-    explicit ChatModel(NetworkManager& networkManager);
+    explicit ChatModel();
     virtual ~ChatModel();
 
     ChatModel(const ChatModel&) = default;
     ChatModel& operator=(const ChatModel&) = default;
 
 private:
-    NetworkManager& networkManager_;
+    Server server_;
+    Client client_;
 };
 
 #endif // CHATMODEL_H
