@@ -17,36 +17,98 @@ void ChatViewModel::handleHelpOption() {
 
 void ChatViewModel::handleMyIPOption() {
     LOG_INFO("My IP option selected.");
-    // Implement my IP option logic here
+    IPAddress ip = model_.getIPAddress();
+    latestMessage_.set({
+        .sender = "System",
+        .content = std::to_string(ip),
+        .timestamp = std::time(nullptr)
+    });
 }
 
 void ChatViewModel::handleMyPortOption() {
     LOG_INFO("My Port option selected.");
-    // Implement my port option logic here
+    Port port = model_.getPort();
+    latestMessage_.set({
+        .sender = "System",
+        .content = std::to_string(port),
+        .timestamp = std::time(nullptr)
+    });
 }
 
-void ChatViewModel::handleConnectOption() {
+void ChatViewModel::handleConnectOption(std::vector<std::string> args) {
     LOG_INFO("Connect option selected.");
-    // Implement connect option logic here
+    if(args.size() < 2) {
+        latestMessage_.set({
+            .sender = "System",
+            .content = "Error: Not enough arguments for connect command.",
+            .timestamp = std::time(nullptr)
+        });
+        return;
+    }
+
+    try{
+        std::string ip = args[0];
+        Port port = static_cast<Port>(std::stoul(args[1]));
+        model_.connectToServer(ip, port);
+    }catch(const std::exception& e){
+        latestMessage_.set({
+            .sender = "System",
+            .content = "Error: Invalid IP address or port.",
+            .timestamp = std::time(nullptr)
+        });
+        return;
+    }
 }
 
 void ChatViewModel::handleListOption() {
     LOG_INFO("List option selected.");
-    // Implement list option logic here
+
+    std::vector<std::pair<ConnFD, std::string>> clients = model_.listClients();
+    std::string clientList;
+    for (const auto& client : clients) {
+        clientList += std::to_string(client.first) + ": " + client.second + "\n";
+    }
+    latestMessage_.set({
+        .sender = "System",
+        .content = clientList.empty() ? "No clients connected." : clientList,
+        .timestamp = std::time(nullptr)
+    });
 }
 
-void ChatViewModel::handleTerminateOption() {
+void ChatViewModel::handleTerminateOption(std::vector<std::string> args) {
     LOG_INFO("Terminate option selected.");
-    // Implement terminate option logic here
 }
 
-void ChatViewModel::handleSendOption() {
+void ChatViewModel::handleSendOption(std::vector<std::string> args) {
     LOG_INFO("Send option selected.");
-    // Implement send option logic here
+    if(args.size() < 2) {
+        latestMessage_.set({
+            .sender = "System",
+            .content = "Error: Not enough arguments for send command.",
+            .timestamp = std::time(nullptr)
+        });
+        return;
+    }
+
+    try{
+        ConnFD conn_id = std::stoul(args[0]);
+        std::string message = args[1];
+        model_.sendMessage(conn_id, message);
+    }catch(const std::exception& e){
+        latestMessage_.set({
+            .sender = "System",
+            .content = "Error: Invalid connection id.",
+            .timestamp = std::time(nullptr)
+        });
+        return;
+    }
 }
 
 void ChatViewModel::handleExitOption() {
     LOG_INFO("Exit option selected.");
-    // Implement exit option logic here
+    model_.~ChatModel();
 }
 
+void ChatViewModel::subcrible(std::function<void(const Message&)> callback) {
+    latestMessage_.subscribe(callback);
+}

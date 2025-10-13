@@ -1,10 +1,12 @@
+#include <algorithm>
 #include <unistd.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 
 #include "core/Client.h"
 #include "utils/Utils.h"
 
-Client::Client() : sfd_list_(-1), is_running_(false) {
+Client::Client() : sfd_list_(), is_running_(true) {
 }
 
 Client::~Client() {
@@ -64,12 +66,12 @@ void Client::start() {
 }
 
 void Client::stop() {
-    is_running_ = false;
-
-    if (!is_running_) {
+    if (isRunning() == false) {
         LOG_WARN("Client is not running");
         return;
     }
+
+    setRunning(false);
 
     for (SocketFD sfd : sfd_list_) {
         close(sfd);
@@ -79,7 +81,17 @@ void Client::stop() {
     LOG_INFO("Client stopped");
 }
 
-void Client::connectToServer(const SocketAddrIn& svaddr) {
+bool Client::isRunning() const {
+    return is_running_;
+}
+
+void Client::setRunning(bool running) {
+    is_running_ = running;
+}
+
+SocketFD Client::connectToServer(std::string addr, Port port) {
+    struct sockaddr_in svaddr;
+
     SocketFD sfd = socket(AF_INET, SOCK_STREAM, 0);
     int flags = fcntl(sfd, F_GETFL, 0);
     fcntl(sfd, F_SETFL, flags | O_NONBLOCK);
@@ -88,16 +100,35 @@ void Client::connectToServer(const SocketAddrIn& svaddr) {
         throw std::runtime_error("Failed to create socket");
     }
 
+    svaddr.sin_family = AF_INET;
+    svaddr.sin_port = htons(port);
+
+    if (inet_pton(AF_INET, addr.c_str(), &svaddr.sin_addr) <= 0){
+        close(sfd);
+        throw std::runtime_error("Invalid address/ Address not supported");
+    }
+
     if (connect(sfd, (struct sockaddr*)&svaddr, sizeof(svaddr)) < 0) {
         close(sfd);
         throw std::runtime_error("Failed to connect to server");
     }
 
     sfd_list_.push_back(sfd);
-
     LOG_INFO("Connected to server");
+
+    return sfd;
 }
 
-bool Client::isRunning() const {
-    return is_running_;
+int32_t Client::sendToServer(SocketFD sfd, const std::string& message) {
+    if(sfd_list_.end() == std::find(sfd_list_.begin(), sfd_list_.end(), sfd)) {
+        LOG_ERROR("Socket FD not found in client list");
+        return -1;
+    }
+    ssize_t bytes_sent = send(sfd, message.c_str(), message.size(), 0);
+    if (bytes_sent < 0) {
+        LOG_ERROR("Failed to send message to server");
+        return -1;
+    }
+    LOG_INFO("Sent to server: %s", message.c_str());
+    return bytes_sent;
 }

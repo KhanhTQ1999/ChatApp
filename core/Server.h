@@ -3,10 +3,18 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <queue>
+#include <unordered_map>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
 #include "common/typedef.h"
+
+typedef struct {
+    ConnFD fd;
+    sockaddr_in address;
+    std::queue<std::string> msg_queue;
+} ClientInfo;
 
 class Server {
 public:
@@ -27,11 +35,11 @@ public:
     Port getPort() const;
     void setAddress(IPAddress addr);
     IPAddress getAddress() const;
+    std::vector<std::pair<ConnFD, std::string>> getClientsList() const;
 
 private:
-    SocketFD sfd_;
     bool is_running_;
-    fd_set readfds_;
+    SocketFD sfd_;
     SocketAddrIn address_;
-    std::vector<int32_t> clients_; 
+    std::unordered_map<ConnFD, ClientInfo> clients_; 
 };

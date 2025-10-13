@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
+
 #include "Server.h"
 #include "utils/Utils.h"
 
@@ -16,7 +18,9 @@ Server::~Server() {
 }
 
 void Server::start() {
-    int32_t new_conn, max_sd;;
+    int32_t max_sd;
+    fd_set readfds, writefds;
+    ConnFD new_conn;
     SocketAddrIn client_address;
     socklen_t client_addr_len = sizeof(client_address);
 
@@ -35,16 +39,17 @@ void Server::start() {
         throw std::runtime_error("Failed to listen on socket");
     }
 
-    LOG_INFO("Server started on port %d", ntohs(address_.sin_port));
-
     while(is_running_) {
         //Reinitialize the file descriptor set
-        FD_ZERO(&readfds_);
-        FD_SET(sfd_, &readfds_);
+        FD_ZERO(&readfds);
+        FD_ZERO(&writefds);
+        FD_SET(sfd_, &readfds);
         max_sd = sfd_;
-        for (int sd : clients_) {
-            FD_SET(sd, &readfds_);
-            max_sd = std::max(max_sd, sd);
+        for(const auto& [fd, cinfo] : clients_) {
+            if (!cinfo.msg_queue.empty()) {
+                FD_SET(fd, &writefds);
+                max_sd = std::max(max_sd, fd);
+            }
         }
 
         //Set timeout to 1 second for select
@@ -53,58 +58,49 @@ void Server::start() {
         timeout.tv_usec = 0;
 
         //Select for readability
-        int activity = select(max_sd + 1, &readfds_, NULL, NULL, NULL);
+        int activity = select(max_sd + 1, &readfds, &writefds, NULL, NULL);
 
         if ((activity < 0) && (errno != EINTR)) {
             LOG_ERROR("Select error");
         }
 
         //Check if there is a new connection
-        if (FD_ISSET(sfd_, &readfds_)) {
+        if (FD_ISSET(sfd_, &readfds)) {
             if ((new_conn = accept(sfd_, (struct sockaddr*)&client_address, &client_addr_len)) < 0) {
                 LOG_ERROR("Failed to accept connection");
                 continue;
             }
             fcntl(new_conn, F_SETFL, fcntl(new_conn, F_GETFL, 0) | O_NONBLOCK);
-            clients_.push_back(new_conn);
+            clients_[new_conn] = {new_conn, client_address, {}};
+
             LOG_INFO("New client connected: %d", new_conn);
         }
 
         //Check for IO operations on client sockets
-        for (int32_t client_fd : clients_) {
-            if (FD_ISSET(client_fd, &readfds_)) {
-                listenClient(client_fd);
-                if(is_running_ == false) break;
+        for(auto& [fd, cinfo] : clients_) {
+            std::queue<std::string> mq = cinfo.msg_queue;
+            if (FD_ISSET(fd, &writefds) && mq.empty() == false) {
+                std::string msg = mq.front();
+                ssize_t bytes_sent = send(fd, msg.c_str(), msg.size(), 0);
+                if (bytes_sent < 0) {
+                    LOG_ERROR("Failed to send message to client %d", fd);
+                } else {
+                    LOG_INFO("Sent to client %d: %s", fd, msg);
+                    mq.pop();
+                }
             }
+            if(is_running_ == false) break;
         }
 
-    }
-}
-
-void Server::listenClient(int32_t client_fd) {
-    char buffer[1024] = {0};
-    int32_t valread = read(client_fd, buffer, 1024);
-    if (valread > 0) {
-        std::string message(buffer, valread);
-        LOG_INFO("Received from client %d: %s", client_fd, message);
-    } else if (valread == 0) {
-        LOG_INFO("Client %d disconnected", client_fd);
-        close(client_fd);
-        for(auto it = clients_.begin(); it != clients_.end(); ++it) {
-            if(*it == client_fd) {
-                clients_.erase(it);
-                break;
-            }
-        }
-    } else {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            LOG_ERROR("Failed to read from client %d", client_fd);
-            close(client_fd);
-        }
     }
 }
 
 void Server::stop() {
+    if (isRunning() == false) {
+        LOG_WARN("Client is not running");
+        return;
+    }
+
     setRunning(false);
 
     if (sfd_ != -1) {
@@ -112,8 +108,8 @@ void Server::stop() {
         sfd_ = -1;
     }
 
-    for (int32_t client_fd : clients_) {
-        close(client_fd);
+    for(auto& [fd, cinfo] : clients_) {
+        close(fd);
     }
     clients_.clear();
 
@@ -126,4 +122,29 @@ void Server::setRunning(bool running) {
 
 bool Server::isRunning() const {
     return is_running_;
+}
+
+IPAddress Server::getAddress() const {
+    return ntohl(address_.sin_addr.s_addr);
+}
+
+Port Server::getPort() const {
+    return ntohs(address_.sin_port);
+}
+
+std::vector<std::pair<ConnFD, std::string>> Server::getClientsList() const {
+    std::vector<std::pair<ConnFD, std::string>> clients;
+    for (const auto& [fd, cinfo] : clients_) {
+        clients.emplace_back(fd, inet_ntoa(cinfo.address.sin_addr));
+    }
+    return clients;
+}
+
+void Server::sendToClient(ConnFD client_fd, const std::string& message) {
+    try{
+        ClientInfo& cinfo = clients_.at(client_fd);
+        cinfo.msg_queue.push(message);
+    } catch (const std::out_of_range& e) {
+        LOG_ERROR("Client %d not found", client_fd);
+    }
 }

@@ -1,4 +1,4 @@
-#pragma one
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -18,8 +18,10 @@ public:
 
     void start();
     void stop();
+    void setRunning(bool running);
     bool isRunning() const;
-    void connectToServer(const SocketAddrIn& svaddr);
+    SocketFD connectToServer(std::string addr, Port port);
+    int32_t sendToServer(SocketFD sfd, const std::string& message);
 
 private:
     bool is_running_;

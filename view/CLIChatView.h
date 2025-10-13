@@ -32,11 +32,13 @@ public:
 
 private:
     void initializeUserOptions();
+    void resignSubscriber();
     void printUsage();
-    void dispatchUserOpt(uint32_t opt);
+    void dispatchUserOpt(std::string cmd, std::vector<std::string> args);
 
 
-    std::unordered_map <uint32_t, UserOption> userOptions_;
+    std::unordered_map <std::string, std::function<void(std::vector<std::string> args)>> cmdInfo_;
+    std::vector<std::string> cmndDesc_;
     AppState appState_;
     ChatViewModel& viewModel_;
 };
