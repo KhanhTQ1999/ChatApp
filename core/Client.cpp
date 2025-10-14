@@ -6,7 +6,7 @@
 #include "core/Client.h"
 #include "utils/Utils.h"
 
-Client::Client() : sfd_list_(), is_running_(true) {
+Client::Client() : sfd_list_(), is_running_(false) {
 }
 
 Client::~Client() {
@@ -18,15 +18,16 @@ void Client::start() {
         LOG_WARN("Client is already running");
         return;
     }
-
+    setRunning(true);
     fd_set readfds;
     while(is_running_){
         //Reinitialize the file descriptor set
+        SocketFD maxfd = -1;
         FD_ZERO(&readfds);
         for (SocketFD sfd : sfd_list_) {
             FD_SET(sfd, &readfds);
+            maxfd = std::max(maxfd, sfd);
         }
-        SocketFD maxfd = sfd_list_.empty() ? -1 : sfd_list_.size();
 
         //Set timeout to 1 second for select
         struct timeval timeout;
@@ -109,8 +110,10 @@ SocketFD Client::connectToServer(std::string addr, Port port) {
     }
 
     if (connect(sfd, (struct sockaddr*)&svaddr, sizeof(svaddr)) < 0) {
-        close(sfd);
-        throw std::runtime_error("Failed to connect to server");
+        if (errno != EINPROGRESS) {
+            close(sfd);
+            throw std::runtime_error("Failed to connect to server");
+        }
     }
 
     sfd_list_.push_back(sfd);

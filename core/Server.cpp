@@ -1,16 +1,18 @@
 #include <iostream>
+#include <cerrno>
 #include <unistd.h>
-#include <sys/select.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
 
 #include "Server.h"
 #include "utils/Utils.h"
+#include "common/RetryOperation.h"
 
-Server::Server(IPAddress addr, Port port) : sfd_(-1), is_running_(true) {
-    address_.sin_family = AF_INET;
-    address_.sin_addr.s_addr = htonl(addr);
-    address_.sin_port = htons(port);
+
+
+Server::Server(Port port) : sfd_(-1), is_running_(true) {
+    port_ = port;
 }
 
 Server::~Server() {
@@ -24,15 +26,11 @@ void Server::start() {
     SocketAddrIn client_address;
     socklen_t client_addr_len = sizeof(client_address);
 
-    sfd_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (sfd_ < 0) {
-        throw std::runtime_error("Failed to create socket");
-    }
-
-    if (bind(sfd_, (struct sockaddr*)&address_, sizeof(address_)) < 0) {
-        close(sfd_);
-        throw std::runtime_error("Failed to bind socket");
-    }
+    std::pair<SocketFD, SocketAddrIn> fdAndAddr = createServerSocket();
+    sfd_ = fdAndAddr.first;
+    address_ = fdAndAddr.second;
+    port_ = ntohs(address_.sin_port);
+    ipAddr_ = inet_ntoa(address_.sin_addr);
 
     if (listen(sfd_, 3) < 0) {
         close(sfd_);
@@ -58,7 +56,7 @@ void Server::start() {
         timeout.tv_usec = 0;
 
         //Select for readability
-        int activity = select(max_sd + 1, &readfds, &writefds, NULL, NULL);
+        int activity = select(max_sd + 1, &readfds, &writefds, nullptr, &timeout);
 
         if ((activity < 0) && (errno != EINTR)) {
             LOG_ERROR("Select error");
@@ -78,21 +76,49 @@ void Server::start() {
 
         //Check for IO operations on client sockets
         for(auto& [fd, cinfo] : clients_) {
-            std::queue<std::string> mq = cinfo.msg_queue;
-            if (FD_ISSET(fd, &writefds) && mq.empty() == false) {
-                std::string msg = mq.front();
+            if (FD_ISSET(fd, &writefds) && cinfo.msg_queue.empty() == false) {
+                std::string msg = cinfo.msg_queue.front();
                 ssize_t bytes_sent = send(fd, msg.c_str(), msg.size(), 0);
                 if (bytes_sent < 0) {
                     LOG_ERROR("Failed to send message to client %d", fd);
                 } else {
                     LOG_INFO("Sent to client %d: %s", fd, msg);
-                    mq.pop();
+                    cinfo.msg_queue.pop();
                 }
             }
             if(is_running_ == false) break;
         }
-
     }
+}
+
+std::pair<SocketFD, SocketAddrIn> Server::createServerSocket(){
+    auto socket_creator = [](int32_t retries_left) -> std::pair<SocketFD, SocketAddrIn> {
+        int port = BASE_PORT + retries_left;
+        SocketFD sfd = socket(AF_INET, SOCK_STREAM, 0);
+        if (sfd < 0) {
+            throw std::runtime_error("Failed to create socket");
+        }
+
+        SocketAddrIn address;
+        address.sin_family = AF_INET;
+        address.sin_addr.s_addr = INADDR_ANY;
+        address.sin_port = htons(port);
+
+        int opt = 1;
+        setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+        if (bind(sfd, (struct sockaddr*)&address, sizeof(address)) == 0) {
+            std::cout << "Successfully bound to port " << port << "\n";
+            return {sfd, address};
+        }
+
+        close(sfd);
+        throw std::runtime_error(std::string("Bind failed: "));
+    };
+
+    std::pair<SocketFD, SocketAddrIn> ret = retryOperation<std::pair<SocketFD, SocketAddrIn>>(socket_creator, 1000, 10);
+
+    return ret;
 }
 
 void Server::stop() {
@@ -125,11 +151,11 @@ bool Server::isRunning() const {
 }
 
 IPAddress Server::getAddress() const {
-    return ntohl(address_.sin_addr.s_addr);
+    return ipAddr_;
 }
 
 Port Server::getPort() const {
-    return ntohs(address_.sin_port);
+    return port_;
 }
 
 std::vector<std::pair<ConnFD, std::string>> Server::getClientsList() const {

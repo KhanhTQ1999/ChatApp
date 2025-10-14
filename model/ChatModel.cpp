@@ -45,9 +45,22 @@ void ChatModel::connectToServer(std::string addr, Port port) {
         throw std::runtime_error("Failed to connect to server");
     }
 
-    std::string addrAndPort = std::to_string(getIPAddress()) + ":" + std::to_string(getPort());
+    std::string addrAndPort = getIPAddress() + ":" + std::to_string(getPort());
     int32_t ret = client_.sendToServer(sfd, "Hello from client at " + addrAndPort);
     if(ret < 0) {
         throw std::runtime_error("Failed to send message to server");
+    }
+}
+
+void ChatModel::endProgram() {
+    server_.stop();
+    client_.stop();
+    
+    if (serverThread_.joinable()) {
+        serverThread_.join();
+    }
+
+    if (clientThread_.joinable()) {
+        clientThread_.join();
     }
 }

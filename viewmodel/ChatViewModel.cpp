@@ -20,7 +20,7 @@ void ChatViewModel::handleMyIPOption() {
     IPAddress ip = model_.getIPAddress();
     latestMessage_.set({
         .sender = "System",
-        .content = std::to_string(ip),
+        .content = ip,
         .timestamp = std::time(nullptr)
     });
 }
@@ -106,7 +106,7 @@ void ChatViewModel::handleSendOption(std::vector<std::string> args) {
 
 void ChatViewModel::handleExitOption() {
     LOG_INFO("Exit option selected.");
-    model_.~ChatModel();
+    model_.endProgram();
 }
 
 void ChatViewModel::subcrible(std::function<void(const Message&)> callback) {

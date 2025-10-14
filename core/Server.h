@@ -10,6 +10,8 @@
 
 #include "common/typedef.h"
 
+#define BASE_PORT 5000
+
 typedef struct {
     ConnFD fd;
     sockaddr_in address;
@@ -18,7 +20,7 @@ typedef struct {
 
 class Server {
 public:
-    Server(IPAddress addr = INADDR_ANY, Port port = 5000);
+    Server(Port port = BASE_PORT);
     virtual ~Server();
 
     Server(const Server&) = default;
@@ -26,6 +28,7 @@ public:
 
     void start();
     void stop();
+    std::pair<SocketFD, SocketAddrIn> createServerSocket();
     void listenClient(int32_t client_fd);
     void sendToClient(int32_t client_fd, const std::string& message);
 
@@ -41,5 +44,7 @@ private:
     bool is_running_;
     SocketFD sfd_;
     SocketAddrIn address_;
+    IPAddress ipAddr_;
+    Port port_;
     std::unordered_map<ConnFD, ClientInfo> clients_; 
 };

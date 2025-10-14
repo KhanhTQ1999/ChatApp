@@ -8,7 +8,7 @@
 class ChatModel
 {
 public:
-    explicit ChatModel();
+    ChatModel();
     virtual ~ChatModel();
 
     ChatModel(const ChatModel&) = default;
@@ -19,6 +19,7 @@ public:
     std::vector<std::pair<ConnFD, std::string>> listClients() const;
     void sendMessage(ConnFD fd, const std::string& message);
     void connectToServer(std::string addr, Port port);
+    void endProgram();
 
 private:
     Server server_;
