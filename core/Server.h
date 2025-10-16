@@ -42,6 +42,7 @@ public:
 
 private:
     bool is_running_;
+    std::vector<ConnFD> unknownConnect_;
     SocketFD sfd_;
     SocketAddrIn address_;
     IPAddress ipAddr_;

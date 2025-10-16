@@ -1,5 +1,3 @@
-#include <iostream>
-#include <string>
 #include <sstream>
 #include <cassert>
 #include "CLIChatView.h"
@@ -82,18 +80,20 @@ void CLIChatView::run()
     printUsage();
     
     while (appState_ == AppState::Running) {
+        //Get user input
         std::cout << "Enter option: ";
         std::getline(std::cin, line);
-
         if (line.empty()) {
             std::cout << "No input detected. Please enter a number.\n";
             continue;
         }
 
+        // Parse command
         std::istringstream ss(line);
         std::string command;
         ss >> command;
         
+        // Parse arguments
         std::vector<std::string> args;
         std::string arg;
         while (ss >> arg) {

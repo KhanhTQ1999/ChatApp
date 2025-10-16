@@ -9,8 +9,6 @@
 #include "utils/Utils.h"
 #include "common/RetryOperation.h"
 
-
-
 Server::Server(Port port) : sfd_(-1), is_running_(true) {
     port_ = port;
 }
@@ -43,6 +41,12 @@ void Server::start() {
         FD_ZERO(&writefds);
         FD_SET(sfd_, &readfds);
         max_sd = sfd_;
+        
+        for(const auto& connFd : unknownConnect_) {
+            FD_SET(connFd, &readfds);
+            max_sd = std::max(max_sd, connFd);
+        }
+
         for(const auto& [fd, cinfo] : clients_) {
             if (!cinfo.msg_queue.empty()) {
                 FD_SET(fd, &writefds);
@@ -70,8 +74,32 @@ void Server::start() {
             }
             fcntl(new_conn, F_SETFL, fcntl(new_conn, F_GETFL, 0) | O_NONBLOCK);
             clients_[new_conn] = {new_conn, client_address, {}};
+            unknownConnect_.push_back(new_conn);
 
             LOG_INFO("New client connected: %d", new_conn);
+        }
+
+        for(auto& connfd : unknownConnect_) {
+            if (FD_ISSET(connfd, &readfds))
+            {
+                char buffer[1025] = {0};
+                ssize_t bytes_read = recv(connfd, buffer, sizeof(buffer) - 1, 0);
+                if (bytes_read <= 0) {
+                    if (bytes_read == 0) {
+                        LOG_INFO("Client %d disconnected", connfd);
+                    } else {
+                        LOG_ERROR("Failed to read from client %d", connfd);
+                    }
+                    close(connfd);
+                } else {
+                    buffer[bytes_read] = '\0';
+                    std::string msg(buffer);
+                    LOG_INFO("Received from client %d: %s", connfd, msg.c_str());
+                    unknownConnect_.erase(std::remove(unknownConnect_.begin(), unknownConnect_.end(), connfd), unknownConnect_.end());
+                    // Here you can process the message as needed
+                }
+            }
+            
         }
 
         //Check for IO operations on client sockets
@@ -123,7 +151,6 @@ std::pair<SocketFD, SocketAddrIn> Server::createServerSocket(){
 
 void Server::stop() {
     if (isRunning() == false) {
-        LOG_WARN("Client is not running");
         return;
     }
 
@@ -138,8 +165,6 @@ void Server::stop() {
         close(fd);
     }
     clients_.clear();
-
-    LOG_INFO("Server stopped");
 }
 
 void Server::setRunning(bool running) {

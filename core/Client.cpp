@@ -6,7 +6,7 @@
 #include "core/Client.h"
 #include "utils/Utils.h"
 
-Client::Client() : sfd_list_(), is_running_(false) {
+Client::Client() : sinfo_list_(), is_running_(false) {
 }
 
 Client::~Client() {
@@ -14,72 +14,87 @@ Client::~Client() {
 }
 
 void Client::start() {
-    if (is_running_) {
+    if (isRunning()) {
         LOG_WARN("Client is already running");
         return;
     }
+
+    int32_t sleepMs = 100;
     setRunning(true);
-    fd_set readfds;
-    while(is_running_){
-        //Reinitialize the file descriptor set
-        SocketFD maxfd = -1;
-        FD_ZERO(&readfds);
-        for (SocketFD sfd : sfd_list_) {
-            FD_SET(sfd, &readfds);
-            maxfd = std::max(maxfd, sfd);
-        }
 
-        //Set timeout to 1 second for select
-        struct timeval timeout;
-        timeout.tv_sec = 1;
-        timeout.tv_usec = 0;
-
-        //Select for readability
-        int32_t activity = select(maxfd + 1, &readfds, nullptr, nullptr, &timeout);
-        if (activity < 0) {
-            LOG_ERROR("Select error");
+    while(isRunning()) {
+        int32_t ret = multiplex();
+        if(ret < 0) {
+            LOG_ERROR("Client multiplex error");
             break;
         }
-
-        //Check for readability on each socket
-        for (int32_t sfd : sfd_list_) {
-            if (FD_ISSET(sfd, &readfds)) {
-                char buffer[1024];
-                int n = read(sfd, buffer, sizeof(buffer));
-                if (n > 0) {
-                    buffer[n] = '\0';
-                    LOG_INFO("Received from server: %s\n", buffer);
-                } else if (n == 0) {
-                    LOG_INFO("Server closed connection");
-                    close(sfd);
-                } else {
-                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                        LOG_ERROR("Read error");
-                        close(sfd);
-                    }
-                }
-            }
-            if(is_running_ == false) break;
-        }
+        sleepMs = ret > 0 ? 100 : 0;
+        usleep(sleepMs * 1000);
     }
 
     LOG_INFO("Client started");
 }
 
+int32_t Client::multiplex() {
+    fd_set readfds;
+    SocketFD maxfd = -1;
+    FD_ZERO(&readfds);
+    for (ServerInfo sinfo : sinfo_list_) {
+        FD_SET(sinfo.fd, &readfds);
+        maxfd = std::max(maxfd, sinfo.fd);
+    }
+
+    //Set timeout to 1 second for select
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 1000;
+
+    //Select for readability
+    int32_t ready = select(maxfd + 1, &readfds, nullptr, nullptr, &timeout);
+    if (ready < 0) {
+        LOG_ERROR("Select error");
+        return -1;
+    } else if (ready == 0) {
+        // Timeout, no sockets are ready
+        return 0;
+    }else if(isRunning()) {
+        // Some sockets are ready
+        for (ServerInfo sinfo : sinfo_list_) {
+            if (FD_ISSET(sinfo.fd, &readfds)) {
+                listenServer(sinfo.fd);
+            }
+        }
+    }
+    return ready;
+}
+
+void Client::listenServer(SocketFD sfd) {
+    char buffer[1024];
+    int n = read(sfd, buffer, sizeof(buffer));
+    if (n > 0) {
+        buffer[n] = '\0';
+        LOG_INFO("Received from server: %s\n", buffer);
+    } else if (n == 0) {
+        LOG_INFO("Server closed connection");
+        close(sfd);
+    } else {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            LOG_ERROR("Read error");
+            close(sfd);
+        }
+    }
+}
+
 void Client::stop() {
     if (isRunning() == false) {
-        LOG_WARN("Client is not running");
         return;
     }
-
     setRunning(false);
 
-    for (SocketFD sfd : sfd_list_) {
-        close(sfd);
+    for (ServerInfo sinfo : sinfo_list_) {
+        close(sinfo.fd);
     }
-    sfd_list_.clear();
-
-    LOG_INFO("Client stopped");
+    sinfo_list_.clear();
 }
 
 bool Client::isRunning() const {
@@ -91,24 +106,28 @@ void Client::setRunning(bool running) {
 }
 
 SocketFD Client::connectToServer(std::string addr, Port port) {
-    struct sockaddr_in svaddr;
-
+    // Create socket
     SocketFD sfd = socket(AF_INET, SOCK_STREAM, 0);
-    int flags = fcntl(sfd, F_GETFL, 0);
-    fcntl(sfd, F_SETFL, flags | O_NONBLOCK);
-
     if (sfd < 0) {
         throw std::runtime_error("Failed to create socket");
     }
 
+    // Configure server address structure
+    struct sockaddr_in svaddr;
     svaddr.sin_family = AF_INET;
     svaddr.sin_port = htons(port);
+    
+    // Set socket to non-blocking
+    int flags = fcntl(sfd, F_GETFL, 0);
+    fcntl(sfd, F_SETFL, flags | O_NONBLOCK);
 
+    // Convert IPv4 and IPv6 addresses from text to binary form
     if (inet_pton(AF_INET, addr.c_str(), &svaddr.sin_addr) <= 0){
         close(sfd);
         throw std::runtime_error("Invalid address/ Address not supported");
     }
 
+    // Connect to server
     if (connect(sfd, (struct sockaddr*)&svaddr, sizeof(svaddr)) < 0) {
         if (errno != EINPROGRESS) {
             close(sfd);
@@ -116,22 +135,36 @@ SocketFD Client::connectToServer(std::string addr, Port port) {
         }
     }
 
-    sfd_list_.push_back(sfd);
+    sinfo_list_.push_back({sfd, addr, port});
     LOG_INFO("Connected to server");
 
     return sfd;
 }
 
 int32_t Client::sendToServer(SocketFD sfd, const std::string& message) {
-    if(sfd_list_.end() == std::find(sfd_list_.begin(), sfd_list_.end(), sfd)) {
-        LOG_ERROR("Socket FD not found in client list");
-        return -1;
+    ssize_t bytes_sent = -1;
+    // Check if sfd is in the list
+    for(const auto& sinfo : sinfo_list_) {
+        if (sinfo.fd == sfd) {
+            // Send message to server
+            ssize_t bytes_sent = send(sfd, message.c_str(), message.size(), 0);
+            if (bytes_sent < 0) {
+                LOG_ERROR("Failed to send message to server");
+                return -1;
+            }
+
+            LOG_INFO("Sent to server: %s", message.c_str());
+            break;
+        }
     }
-    ssize_t bytes_sent = send(sfd, message.c_str(), message.size(), 0);
-    if (bytes_sent < 0) {
-        LOG_ERROR("Failed to send message to server");
-        return -1;
-    }
-    LOG_INFO("Sent to server: %s", message.c_str());
+    // If not found, return error
+    LOG_ERROR("Socket FD not found in server list");
+    return -1;
+
+
     return bytes_sent;
+}
+
+std::vector<ServerInfo> Client::getSInfoList() const {
+    return sinfo_list_;
 }

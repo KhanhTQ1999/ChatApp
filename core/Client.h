@@ -1,4 +1,4 @@
-#pragma once
+#pragma one
 
 #include <iostream>
 #include <string>
@@ -7,6 +7,12 @@
 #include <sys/socket.h>
 
 #include "common/typedef.h"
+
+typedef struct {
+    ConnFD fd;
+    std::string address;
+    Port port;
+} ServerInfo;
 
 class Client {
 public:
@@ -18,6 +24,9 @@ public:
 
     void start();
     void stop();
+    int32_t multiplex();
+    void listenServer(SocketFD sfd);
+    std::vector<ServerInfo> getSInfoList() const;
     void setRunning(bool running);
     bool isRunning() const;
     SocketFD connectToServer(std::string addr, Port port);
@@ -25,5 +34,5 @@ public:
 
 private:
     bool is_running_;
-    std::vector<SocketFD> sfd_list_;
+    std::vector<ServerInfo> sinfo_list_;
 };
