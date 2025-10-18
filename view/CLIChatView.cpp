@@ -82,7 +82,7 @@ void CLIChatView::run()
     
     while (appState_ == AppState::Running) {
         //Get user input
-        auto [ret, error] = pattern::tryCatchWithTuple("CLIChatView::run", [&]() {
+        pattern::tryCatch("CLIChatView::run", [&]() {
             line = getUserInput();
             validateUserInput(line);
             auto [command, args] = parseInput(line);

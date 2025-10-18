@@ -24,7 +24,7 @@ public:
     void handleSendOption(std::vector<std::string> args);
     void handleExitOption();
     void subcrible(std::function<void(const Message&)> callback);
-    void notifyObservers(std::string message, std::time_t timestamp);
+    void notifyObservers(std::string message, std::time_t timestamp = std::time(nullptr));
 
 private:
     ChatModel& model_;

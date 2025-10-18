@@ -2,6 +2,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include "../utils/Utils.h"
 
 namespace pattern
 {
@@ -10,9 +11,9 @@ namespace pattern
         try {
             std::forward<Func>(func)();
         } catch (const std::exception& ex) {
-            LOG_ERROR(context + " failed: " + ex.what());
+            LOG_ERROR("%s failed: %s", context, ex.what());
         } catch (...) {
-            LOG_ERROR(context + " failed: Unknown error");
+            LOG_ERROR("%s failed: Unknown error", context);
         }
     }
 
@@ -21,16 +22,28 @@ namespace pattern
         try {
             return std::forward<Func>(func)();
         } catch (const std::exception& ex) {
-            LOG_ERROR(context + " failed: " + ex.what());
+            LOG_ERROR("%s failed: %s", context, ex.what());
         } catch (...) {
-            LOG_ERROR(context + " failed: Unknown error");
+            LOG_ERROR("%s failed: Unknown error", context);
         }
         return std::nullopt;
     }
 
     template<typename Func>
-    inline auto tryCatchWithTuple(const std::string& context, Func&& func)
-        -> std::tuple<std::optional<decltype(func())>, std::optional<std::string>>
+    inline std::optional<std::string> tryCatchWithError(const std::string& context, Func&& func) {
+        try {
+            std::forward<Func>(func)();
+            return std::nullopt;
+        } catch (const std::exception& ex) {
+            return context + " failed: " + std::string(ex.what());
+        } catch (...) {
+            return context + " failed: Unknown error";
+        }
+    }
+
+    template<typename Func>
+    inline auto tryCatchWithPair(const std::string& context, Func&& func)
+        -> std::pair<std::optional<decltype(func())>, std::optional<std::string>>
     {
         try {
             return { std::forward<Func>(func)(), std::nullopt };
