@@ -144,7 +144,7 @@ std::pair<SocketFD, SocketAddrIn> Server::createServerSocket(){
         throw std::runtime_error(std::string("Bind failed: "));
     };
 
-    std::pair<SocketFD, SocketAddrIn> ret = retryOperation<std::pair<SocketFD, SocketAddrIn>>(socket_creator, 1000, 10);
+    std::pair<SocketFD, SocketAddrIn> ret = pattern::retryOperation<std::pair<SocketFD, SocketAddrIn>>(socket_creator, 1000, 10);
 
     return ret;
 }

@@ -2,7 +2,7 @@
 #include <iostream>
 #include <mutex>
 
-namespace base
+namespace pattern
 {
     template <typename T>
     class Singleton {
@@ -35,7 +35,7 @@ namespace base
 }
 
 #define MAKE_SINGLETON(classname)                    \
-        friend class base::Singleton<classname>;              \
+        friend class pattern::Singleton<classname>;              \
     private:                                                \
         classname(const classname&);                        \
         classname& operator=(const classname);              \

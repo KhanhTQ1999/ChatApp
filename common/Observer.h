@@ -2,7 +2,7 @@
 #include <functional>
 #include <vector>
 
-namespace base
+namespace pattern
 {
     template<typename T>
     class Observer {

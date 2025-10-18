@@ -34,6 +34,9 @@ private:
     void initializeUserOptions();
     void resignSubscriber();
     void printUsage();
+    std::string getUserInput();
+    void validateUserInput(std::string& input);
+    std::pair<std::string, std::vector<std::string>> parseInput(std::string& input);
     void dispatchUserOpt(std::string cmd, std::vector<std::string> args);
 
 

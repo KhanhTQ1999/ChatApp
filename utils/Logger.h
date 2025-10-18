@@ -12,7 +12,7 @@ enum class LogLevel {
     TRACE, DEBUG, INFO, WARN, ERROR, FATAL
 };
 
-class Logger : public base::Singleton<Logger> {
+class Logger : public pattern::Singleton<Logger> {
     MAKE_SINGLETON(Logger)
 
 public:

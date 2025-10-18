@@ -1,5 +1,6 @@
 #include "utils/Utils.h"
 #include "viewmodel/ChatViewModel.h"
+#include "common/TryCatch.h"
 
 ChatViewModel::ChatViewModel(ChatModel& model) : model_(model) {
     //TODO: Initialization if necessary
@@ -18,46 +19,31 @@ void ChatViewModel::handleHelpOption() {
 void ChatViewModel::handleMyIPOption() {
     LOG_INFO("My IP option selected.");
     IPAddress ip = model_.getIPAddress();
-    latestMessage_.set({
-        .sender = "System",
-        .content = ip,
-        .timestamp = std::time(nullptr)
-    });
+    notifyObservers(ip);
 }
 
 void ChatViewModel::handleMyPortOption() {
     LOG_INFO("My Port option selected.");
     Port port = model_.getPort();
-    latestMessage_.set({
-        .sender = "System",
-        .content = std::to_string(port),
-        .timestamp = std::time(nullptr)
-    });
+    notifyObservers(std::to_string(port));
 }
 
 void ChatViewModel::handleConnectOption(std::vector<std::string> args) {
     LOG_INFO("Connect option selected.");
-    if(args.size() < 2) {
-        latestMessage_.set({
-            .sender = "System",
-            .content = "Error: Not enough arguments for connect command.",
-            .timestamp = std::time(nullptr)
-        });
-        return;
-    }
 
-    try{
+    auto [ret, error] = pattern::tryCatchWithTuple("Connect to server", [this, &args]() {
+        if(args.size() < 2) {
+            throw std::runtime_error("Not enough arguments for connect command.");
+        }
         std::string ip = args[0];
         Port port = static_cast<Port>(std::stoul(args[1]));
         model_.connectToServer(ip, port);
-    }catch(const std::exception& e){
-        latestMessage_.set({
-            .sender = "System",
-            .content = "Error: Invalid IP address or port.",
-            .timestamp = std::time(nullptr)
-        });
-        return;
+    });
+
+    if(error) {
+        notifyObservers(*error);
     }
+    return;
 }
 
 void ChatViewModel::handleListOption() {
@@ -68,11 +54,7 @@ void ChatViewModel::handleListOption() {
     for (const auto& client : clients) {
         clientList += std::to_string(client.first) + ": " + client.second + "\n";
     }
-    latestMessage_.set({
-        .sender = "System",
-        .content = clientList.empty() ? "No clients connected." : clientList,
-        .timestamp = std::time(nullptr)
-    });
+    notifyObservers(clientList);
 }
 
 void ChatViewModel::handleTerminateOption(std::vector<std::string> args) {
@@ -81,29 +63,29 @@ void ChatViewModel::handleTerminateOption(std::vector<std::string> args) {
 
 void ChatViewModel::handleSendOption(std::vector<std::string> args) {
     LOG_INFO("Send option selected.");
-    if(args.size() < 2) {
-        latestMessage_.set({
-            .sender = "System",
-            .content = "Error: Not enough arguments for send command.",
-            .timestamp = std::time(nullptr)
-        });
-        return;
-    }
 
-    try{
-        ConnFD conn_id = std::stoul(args[0]);
+    auto [ret, error] = pattern::tryCatchWithTuple("Send message", [this, &args]() {
+        if(args.size() < 2) {
+            throw std::runtime_error("Not enough arguments for send command.");
+        }
+        ConnFD conn_id = static_cast<ConnFD>(std::stoul(args[0]));
         std::string message = args[1];
         model_.sendMessage(conn_id, message);
-    }catch(const std::exception& e){
-        latestMessage_.set({
-            .sender = "System",
-            .content = "Error: Invalid connection id.",
-            .timestamp = std::time(nullptr)
-        });
-        return;
+    });
+
+    if(error) {
+        notifyObservers(*error);
     }
+    return;
 }
 
+void ChatViewModel::notifyObservers(std::string message, std::time_t timestamp = std::time(nullptr)) {
+    latestMessage_.set({
+        .sender = "System",
+        .content = message,
+        .timestamp = timestamp
+    });
+}
 void ChatViewModel::handleExitOption() {
     LOG_INFO("Exit option selected.");
     model_.endProgram();

@@ -1,6 +1,7 @@
 #include <sstream>
 #include <cassert>
 #include "CLIChatView.h"
+#include "common/TryCatch.h"
 
 CLIChatView::CLIChatView(ChatViewModel& viewModel)
     : appState_(AppState::Running), viewModel_(viewModel){
@@ -81,27 +82,43 @@ void CLIChatView::run()
     
     while (appState_ == AppState::Running) {
         //Get user input
-        std::cout << "Enter option: ";
-        std::getline(std::cin, line);
-        if (line.empty()) {
-            std::cout << "No input detected. Please enter a number.\n";
-            continue;
-        }
-
-        // Parse command
-        std::istringstream ss(line);
-        std::string command;
-        ss >> command;
-        
-        // Parse arguments
-        std::vector<std::string> args;
-        std::string arg;
-        while (ss >> arg) {
-            args.push_back(arg);
-        }
-
-        dispatchUserOpt(command, args);
+        auto [ret, error] = pattern::tryCatchWithTuple("CLIChatView::run", [&]() {
+            line = getUserInput();
+            validateUserInput(line);
+            auto [command, args] = parseInput(line);
+            dispatchUserOpt(command, args);
+        });
     }
+}
+
+std::string CLIChatView::getUserInput() {
+    std::cout << "Enter option: ";
+    std::string line;
+    std::getline(std::cin, line);
+    return line;
+}
+
+
+void CLIChatView::validateUserInput(std::string& input)
+{
+    if(input.empty()) {
+        throw std::runtime_error("Input cannot be empty.");
+    }
+}
+
+std::pair<std::string, std::vector<std::string>> CLIChatView::parseInput(std::string& input)
+{
+    std::istringstream ss(input);
+    std::string command;
+    ss >> command;
+
+    std::vector<std::string> args;
+    std::string arg;
+    while (ss >> arg) {
+        args.push_back(arg);
+    }
+
+    return {command, args};
 }
 
 void CLIChatView::dispatchUserOpt(std::string cmd, std::vector<std::string> args)
