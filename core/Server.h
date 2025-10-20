@@ -2,8 +2,12 @@
 
 #include <iostream>
 #include <string>
+#include <memory>
 #include <vector>
 #include <queue>
+#include <atomic>
+#include <thread>
+#include <shared_mutex>
 #include <unordered_map>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -27,8 +31,9 @@ public:
     Server& operator=(const Server&) = default;
 
     void start();
+    void runLoop();
     void stop();
-    std::pair<SocketFD, SocketAddrIn> createServerSocket();
+    void cleanup();
     void listenClient(int32_t client_fd);
     void sendToClient(int32_t client_fd, const std::string& message);
 
@@ -38,14 +43,24 @@ public:
     Port getPort() const;
     void setAddress(IPAddress addr);
     IPAddress getAddress() const;
+    SocketFD getSfd() const;
     std::vector<std::pair<ConnFD, std::string>> getClientsList() const;
 
 private:
-    bool is_running_;
+    void multiplexClients(SocketFD max_sd, fd_set& readfds, fd_set& writefds, struct timeval& timeout);
+    SocketFD createSocket() const;
+    SocketAddrIn buildAddress(const std::string& addr, Port port) const;
+    std::pair<SocketFD, SocketAddrIn> bindAddress() const;
+    struct timeval getSelectTimeout() const;
+    SocketFD initializeReadFds(fd_set& readfds);
+    SocketFD initializeWriteFds(fd_set& writefds);
+
+    std::atomic<bool> is_running_;
     std::vector<ConnFD> unknownConnect_;
     SocketFD sfd_;
     SocketAddrIn address_;
     IPAddress ipAddr_;
     Port port_;
     std::unordered_map<ConnFD, ClientInfo> clients_; 
+    std::shared_ptr<std::thread> worker_;
 };

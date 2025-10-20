@@ -18,14 +18,32 @@ Server::~Server() {
 }
 
 void Server::start() {
+    //Check if already running
+    if (is_running_.exchange(true)) {
+        LOG_WARN("Client is already running");
+        return;
+    }
+
+    //Start worker thread
+    worker_ = std::make_shared<std::thread>([this]() {
+        runLoop();
+        stop();
+    });
+}
+
+void Server::runLoop() {
+    int32_t opt = 1;
     int32_t max_sd;
     fd_set readfds, writefds;
-    ConnFD new_conn;
+    
     SocketAddrIn client_address;
     socklen_t client_addr_len = sizeof(client_address);
 
-    std::pair<SocketFD, SocketAddrIn> fdAndAddr = createServerSocket();
-    sfd_ = fdAndAddr.first;
+
+    sfd_ = createSocket();
+    setsockopt(sfd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    std::pair<SocketFD, SocketAddrIn> fdAndAddr = bindAddress();
+
     address_ = fdAndAddr.second;
     port_ = ntohs(address_.sin_port);
     ipAddr_ = inet_ntoa(address_.sin_addr);
@@ -37,124 +55,147 @@ void Server::start() {
 
     while(is_running_) {
         //Reinitialize the file descriptor set
-        FD_ZERO(&readfds);
-        FD_ZERO(&writefds);
-        FD_SET(sfd_, &readfds);
-        max_sd = sfd_;
-        
-        for(const auto& connFd : unknownConnect_) {
-            FD_SET(connFd, &readfds);
-            max_sd = std::max(max_sd, connFd);
-        }
-
-        for(const auto& [fd, cinfo] : clients_) {
-            if (!cinfo.msg_queue.empty()) {
-                FD_SET(fd, &writefds);
-                max_sd = std::max(max_sd, fd);
-            }
-        }
+        SocketFD read_max_sd = initializeReadFds(readfds);
+        SocketFD write_max_sd = initializeWriteFds(writefds);
+        max_sd = std::max(read_max_sd, write_max_sd);
 
         //Set timeout to 1 second for select
-        struct timeval timeout;
-        timeout.tv_sec = 1;
-        timeout.tv_usec = 0;
+        struct timeval timeout = getSelectTimeout();
 
-        //Select for readability
-        int activity = select(max_sd + 1, &readfds, &writefds, nullptr, &timeout);
+        // Communicate client activity
+        multiplexClients(max_sd, readfds, writefds, timeout);
+    }
+}
 
-        if ((activity < 0) && (errno != EINTR)) {
-            LOG_ERROR("Select error");
-        }
+void Server::multiplexClients(SocketFD max_sd, fd_set& readfds, fd_set& writefds, struct timeval& timeout) {
+    //Select for readability and writability
+    int32_t ready = select(max_sd + 1, &readfds, &writefds, nullptr, &timeout);
+    if(ready < 0) {
+        throw std::runtime_error("Select error");
+    }
 
-        //Check if there is a new connection
+    // Check if any sockets are ready
+    if(ready > 0 && is_running_) {
+        //Check for new connections
         if (FD_ISSET(sfd_, &readfds)) {
-            if ((new_conn = accept(sfd_, (struct sockaddr*)&client_address, &client_addr_len)) < 0) {
-                LOG_ERROR("Failed to accept connection");
-                continue;
+            ConnFD new_conn; = accept(sfd_, (struct sockaddr*)&client_address, &client_addr_len);
+            if (new_conn < 0) {
+                LOG_ERROR("Accept failed");
+            } else {
+                //Add new client
+                clients_.emplace(new_conn, ClientInfo{new_conn, client_address, std::queue<std::string>()});
+                LOG_INFO("New client connected: %s", inet_ntoa(client_address.sin_addr));
             }
-            fcntl(new_conn, F_SETFL, fcntl(new_conn, F_GETFL, 0) | O_NONBLOCK);
-            clients_[new_conn] = {new_conn, client_address, {}};
-            unknownConnect_.push_back(new_conn);
-
-            LOG_INFO("New client connected: %d", new_conn);
         }
 
-        for(auto& connfd : unknownConnect_) {
-            if (FD_ISSET(connfd, &readfds))
-            {
-                char buffer[1025] = {0};
-                ssize_t bytes_read = recv(connfd, buffer, sizeof(buffer) - 1, 0);
-                if (bytes_read <= 0) {
-                    if (bytes_read == 0) {
-                        LOG_INFO("Client %d disconnected", connfd);
-                    } else {
-                        LOG_ERROR("Failed to read from client %d", connfd);
+        //Check existing clients for readability
+        for (auto it = clients_.begin(); it != clients_.end(); ) {
+            ConnFD client_fd = it->first;
+            ClientInfo& cinfo = it->second;
+
+            //Handle readable client sockets
+            if (FD_ISSET(client_fd, &readfds)) {
+                listenClient(client_fd);
+            }
+
+            //Handle writable client sockets
+            if (FD_ISSET(client_fd, &writefds)) {
+                while (!cinfo.msg_queue.empty()) {
+                    const std::string& msg = cinfo.msg_queue.front();
+                    ssize_t bytes_sent = send(client_fd, msg.c_str(), msg.size(), 0);
+                    if (bytes_sent < 0) {
+                        LOG_ERROR("Failed to send message to client (fd=%d)", client_fd);
+                        break;
                     }
-                    close(connfd);
-                } else {
-                    buffer[bytes_read] = '\0';
-                    std::string msg(buffer);
-                    LOG_INFO("Received from client %d: %s", connfd, msg.c_str());
-                    unknownConnect_.erase(std::remove(unknownConnect_.begin(), unknownConnect_.end(), connfd), unknownConnect_.end());
-                    // Here you can process the message as needed
-                }
-            }
-            
-        }
-
-        //Check for IO operations on client sockets
-        for(auto& [fd, cinfo] : clients_) {
-            if (FD_ISSET(fd, &writefds) && cinfo.msg_queue.empty() == false) {
-                std::string msg = cinfo.msg_queue.front();
-                ssize_t bytes_sent = send(fd, msg.c_str(), msg.size(), 0);
-                if (bytes_sent < 0) {
-                    LOG_ERROR("Failed to send message to client %d", fd);
-                } else {
-                    LOG_INFO("Sent to client %d: %s", fd, msg);
                     cinfo.msg_queue.pop();
                 }
             }
-            if(is_running_ == false) break;
+            ++it;
         }
     }
 }
 
-std::pair<SocketFD, SocketAddrIn> Server::createServerSocket(){
-    auto socket_creator = [](int32_t retries_left) -> std::pair<SocketFD, SocketAddrIn> {
+SocketFD Server::initializeReadFds(fd_set& readfds) {
+    FD_ZERO(&readfds);
+    SocketFD maxfd = sfd_;
+
+    //Add server socket
+    FD_SET(sfd_, &readfds);
+
+    //Add client sockets
+    for (const auto& [fd, cinfo] : clients_) {
+        FD_SET(fd, &readfds);
+        maxfd = std::max(maxfd, fd);
+    }
+
+    return maxfd;
+}
+
+SocketFD Server::initializeWriteFds(fd_set& writefds) {
+    SocketFD max_sd = -1;
+    FD_ZERO(&writefds);
+
+    for(const auto& [fd, cinfo] : clients_) {
+        if (!cinfo.msg_queue.empty()) {
+            FD_SET(fd, &writefds);
+            max_sd = std::max(max_sd, fd);
+        }
+    }
+    return max_sd;
+}
+
+struct timeval Server::getSelectTimeout() const {
+    return {0, 100000}; // 1 second
+}
+
+std::pair<SocketFD, SocketAddrIn> Server::bindAddress() const{
+
+    auto binder = [this](int32_t retries_left) -> std::pair<SocketFD, SocketAddrIn> {
+        int32_t opt = 1;
         int port = BASE_PORT + retries_left;
-        SocketFD sfd = socket(AF_INET, SOCK_STREAM, 0);
-        if (sfd < 0) {
-            throw std::runtime_error("Failed to create socket");
+        SocketFD sfd = getSfd();
+        SocketAddrIn svaddr = buildAddress(INADDR_ANY, port);
+        
+        if (bind(sfd, (struct sockaddr*)&svaddr, sizeof(svaddr)) < 0) {
+            close(sfd);
+            throw std::runtime_error("Bind failed");
         }
-
-        SocketAddrIn address;
-        address.sin_family = AF_INET;
-        address.sin_addr.s_addr = INADDR_ANY;
-        address.sin_port = htons(port);
-
-        int opt = 1;
-        setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-        if (bind(sfd, (struct sockaddr*)&address, sizeof(address)) == 0) {
-            std::cout << "Successfully bound to port " << port << "\n";
-            return {sfd, address};
-        }
-
-        close(sfd);
-        throw std::runtime_error(std::string("Bind failed: "));
+        return {sfd, svaddr};
     };
 
-    std::pair<SocketFD, SocketAddrIn> ret = pattern::retryOperation<std::pair<SocketFD, SocketAddrIn>>(socket_creator, 1000, 10);
+    return pattern::retryOperation<std::pair<SocketFD, SocketAddrIn>>(binder, 1000, 10);
+}
 
-    return ret;
+SocketFD Server::createSocket() const {
+    SocketFD sfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sfd < 0) {
+        throw std::runtime_error("Failed to create socket");
+    }
+    return sfd;
+}
+
+SocketAddrIn Server::buildAddress(const std::string& addr, Port port) const {
+    SocketAddrIn svaddr;
+    svaddr.sin_family = AF_INET;
+    svaddr.sin_addr.s_addr = INADDR_ANY;
+    svaddr.sin_port = htons(port);
+    return svaddr;
 }
 
 void Server::stop() {
-    if (isRunning() == false) {
+    //Check if already stopped
+    if (!is_running_.exchange(false)) {
         return;
     }
+    cleanup();
+}
 
-    setRunning(false);
+void Server::cleanup(){
+    //Wait for worker thread to finish
+    if (worker_ && worker_->joinable()) {
+        worker_->join();
+        worker_.reset();
+    }
 
     if (sfd_ != -1) {
         close(sfd_);
@@ -181,6 +222,10 @@ IPAddress Server::getAddress() const {
 
 Port Server::getPort() const {
     return port_;
+}
+
+SocketFD Server::getSfd() const {
+    return sfd_;
 }
 
 std::vector<std::pair<ConnFD, std::string>> Server::getClientsList() const {

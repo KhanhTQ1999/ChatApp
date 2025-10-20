@@ -1,26 +1,13 @@
 #include "model/ChatModel.h"
 
 ChatModel::ChatModel() {
-    serverThread_ = std::thread([this]() {
-        server_.start();
-    });
-
-    clientThread_ = std::thread([this]() {
-        client_.start();
-    });
+    server_.start();
+    client_.start();
 }
 
 ChatModel::~ChatModel() {
     server_.stop();
     client_.stop();
-    
-    if (serverThread_.joinable()) {
-        serverThread_.join();
-    }
-
-    if (clientThread_.joinable()) {
-        clientThread_.join();
-    }
 }
 
 IPAddress ChatModel::getIPAddress() const {
@@ -55,12 +42,4 @@ void ChatModel::connectToServer(std::string addr, Port port) {
 void ChatModel::endProgram() {
     server_.stop();
     client_.stop();
-    
-    if (serverThread_.joinable()) {
-        serverThread_.join();
-    }
-
-    if (clientThread_.joinable()) {
-        clientThread_.join();
-    }
 }

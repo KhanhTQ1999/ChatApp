@@ -31,7 +31,7 @@ void ChatViewModel::handleMyPortOption() {
 void ChatViewModel::handleConnectOption(std::vector<std::string> args) {
     LOG_INFO("Connect option selected.");
 
-    auto [ret, error] = pattern::tryCatchWithTuple("Connect to server", [this, &args]() {
+    auto error = pattern::tryCatchWithError("Connect to server", [this, &args]() {
         if(args.size() < 2) {
             throw std::runtime_error("Not enough arguments for connect command.");
         }
@@ -64,7 +64,7 @@ void ChatViewModel::handleTerminateOption(std::vector<std::string> args) {
 void ChatViewModel::handleSendOption(std::vector<std::string> args) {
     LOG_INFO("Send option selected.");
 
-    auto [ret, error] = pattern::tryCatchWithTuple("Send message", [this, &args]() {
+    auto error = pattern::tryCatchWithError("Send message", [this, &args]() {
         if(args.size() < 2) {
             throw std::runtime_error("Not enough arguments for send command.");
         }
@@ -79,7 +79,7 @@ void ChatViewModel::handleSendOption(std::vector<std::string> args) {
     return;
 }
 
-void ChatViewModel::notifyObservers(std::string message, std::time_t timestamp = std::time(nullptr)) {
+void ChatViewModel::notifyObservers(std::string message, std::time_t timestamp) {
     latestMessage_.set({
         .sender = "System",
         .content = message,
