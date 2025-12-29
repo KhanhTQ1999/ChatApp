@@ -20,10 +20,9 @@ include_directories(
 # Collect all source files
 file(GLOB_RECURSE SOURCES
     ${PROJECT_SOURCE_DIR}/common/*.cpp
-    ${PROJECT_SOURCE_DIR}/core/*.cpp
     ${PROJECT_SOURCE_DIR}/model/*.cpp
-    ${PROJECT_SOURCE_DIR}/view/*.cpp
-    ${PROJECT_SOURCE_DIR}/viewmodel/*.cpp
+    ${PROJECT_SOURCE_DIR}/views/*.cpp
+    ${PROJECT_SOURCE_DIR}/controller/*.cpp
     ${PROJECT_SOURCE_DIR}/utils/*.cpp
     ${PROJECT_SOURCE_DIR}/main.cpp
 )

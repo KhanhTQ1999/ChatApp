@@ -5,8 +5,8 @@
 
 #include "utils/Utils.h"
 #include "model/ChatModel.h"
-#include "viewmodel/ChatViewModel.h"
-#include "view/CLIChatView.h"
+#include "controller/Controller.h"
+#include "views/ChatView.h"
 
 void printUsage(const char *argv){
     std::cout << "Use: " << argv << std::endl;
@@ -47,21 +47,11 @@ int main(int argc, char* argv[]) {
     }
 
     //Initialize components
-    ChatModel model;
-    ChatViewModel viewModel(model);
-
-    std::unique_ptr<IChatView> chatView;
-    if (uiType == "CLI")
-    {
-        chatView = std::make_unique<CLIChatView>(viewModel);
-    }
-    else
-    {
-        LOG_ERROR("Unsupported UI type. Supported types are: CLI");
-        return 1;
-    }
+    ChatModel chatModel;
+    ChatView chatView;
+    Controller controller(chatModel, chatView);
 
     //Start application
-    chatView->run();
+    chatView.show();
     return 0;
 }

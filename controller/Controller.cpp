@@ -1,0 +1,104 @@
+#include "common/typedef.h"
+#include "utils/Utils.h"
+#include "controller/Controller.h"
+
+Controller::Controller(ChatModel& model, IView& view)
+    : model_(model), view_(view), appState_(AppState::Stopped)
+{
+    dispatcher_ = {
+        {"help",      [this](const std::vector<std::string>&) { handleHelpOption(); }},
+        {"myip",      [this](const std::vector<std::string>&) { handleMyIPOption(); }},
+        {"myport",    [this](const std::vector<std::string>&) { handleMyPortOption(); }},
+        {"connect",   [this](const std::vector<std::string>& args) { handleConnectOption(args); }},
+        {"list",      [this](const std::vector<std::string>&) { handleListOption(); }},
+        {"terminate", [this](const std::vector<std::string>& args) { handleTerminateOption(args); }},
+        {"send",      [this](const std::vector<std::string>& args) { handleSendOption(args); }},
+        {"exit",      [this](const std::vector<std::string>&) { stop(); }}
+    };
+};
+
+void Controller::start() {
+    if (isRunning()) {
+        LOG_WARN("Application is already running");
+        return;
+    }
+
+    appState_ = AppState::Running;
+    view_.show();
+    runLoop();
+}
+
+void Controller::runLoop() {
+}
+
+bool Controller::isRunning() const {
+    return appState_ == AppState::Running;
+}
+
+bool Controller::validateUserInput(const std::string& input) {
+    return !input.empty();
+}
+
+std::pair<std::string, std::vector<std::string>> Controller::parseInput(std::string& input) {
+    std::istringstream ss(input);
+    std::string command;
+    ss >> command;
+
+    std::vector<std::string> args;
+    std::string arg;
+    while (ss >> arg) {
+        args.push_back(arg);
+    }
+
+    return {command, args};
+}
+
+void Controller::dispatchUserCommand(const std::string cmd, const std::vector<std::string> args) {
+    auto it = dispatcher_.find(cmd);
+    if (it != dispatcher_.end()) {
+        it->second(args);
+    } else {
+        std::cout << "Invalid command. Type 'help' for available options." << std::endl;
+    }
+}
+
+void Controller::stop() {
+    //To do: Implement any cleanup logic if necessary
+}
+
+// Show help menu to the user
+void Controller::handleHelpOption() {
+    // TODO: Implement logic to display available commands
+}
+
+// Show the current IP address of the application
+void Controller::handleMyIPOption() {
+    // TODO: Implement logic to retrieve and display local IP
+}
+
+// Show the current port number of the application
+void Controller::handleMyPortOption() {
+    // TODO: Implement logic to retrieve and display local port
+}
+
+// Connect to a peer using host and port arguments
+void Controller::handleConnectOption(const std::vector<std::string>& args) {
+    // TODO: Implement logic to connect to a peer
+    // args[0] = host, args[1] = port
+}
+
+// List all active peer connections
+void Controller::handleListOption() {
+    // TODO: Implement logic to list all current connections
+}
+
+// Terminate a connection by its ID
+void Controller::handleTerminateOption(const std::vector<std::string>& args) {
+    // TODO: Implement logic to terminate a connection
+    // args[0] = connection ID
+}
+
+// Send a message to a peer by connection ID
+void Controller::handleSendOption(const std::vector<std::string>& args) {
+    // TODO: Implement logic
+}
