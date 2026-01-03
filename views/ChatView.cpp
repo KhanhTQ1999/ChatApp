@@ -1,18 +1,20 @@
 #include "utils/Utils.h"
 #include "views/ChatView.h"
 
-ChatView::ChatView()
+ChatView::ChatView(AppContext& context)
+    : context_(context)
 {
-    cmndDesc_ = {
-        "1. help                              : Display user interface options\n",
-        "2. myip                              : Display IP address of this app\n",
-        "3. myport                            : Display listening port of this app\n",
-        "4. connect <dest> <port>             : Connect to the app of another computer\n",
-        "5. list                              : List all connections of this app\n",
-        "6. terminate <connection id>         : Terminate a connection\n",
-        "7. send <connection id> <message>    : Send a message to a connection\n",
-        "8. exit                              : Close all connections & terminate this app\n"
-    };}
+    chatOption_ = {
+        {"help", " - Display this help menu\n"},
+        {"myip", " - Display your IP address\n"},
+        {"myport", " - Display your listening port\n"},
+        {"connect <ip> <port>", " - Connect to a peer\n"},
+        {"list", " - List all connected peers\n"},
+        {"terminate <connection id>", " - Terminate a connection\n"},
+        {"send <connection id> <message>", " - Send a message to a peer\n"},
+        {"exit", " - Exit the application\n"}
+    };
+}
 
 void ChatView::show(){
     if(getHideShowState()){
@@ -20,23 +22,11 @@ void ChatView::show(){
         return;
     }
     setHideShowState(true);
-    showMenu();
-
-    while(getHideShowState()){
-        listenUser();
-    }
+    context_.eventBus.emit("ui::show-chat-menu", chatOption_);
 }
 
 ChatView::~ChatView(){
     //Nothing to clean up
-}
-
-void ChatView::showMenu(){
-    std::cout << "================== MENU ==================" << std::endl;
-    for (const auto& desc : cmndDesc_) {
-        std::cout << desc;
-    }
-    std::cout << "==========================================" << std::endl;
 }
 
 void ChatView::hide(){
@@ -45,17 +35,7 @@ void ChatView::hide(){
         return;
     }
     setHideShowState(false);
-}
-
-void ChatView::listenUser(){
-    std::string input;
-    std::cout << "Enter command: ";
-    std::getline(std::cin, input);
-    if(input == "exit"){
-        hide();
-        return;
-    }
-    //Notify controller about user input
+    context_.eventBus.emit("ui::hide-chat-menu", chatOption_);
 }
 
 void ChatView::setHideShowState(bool state){
