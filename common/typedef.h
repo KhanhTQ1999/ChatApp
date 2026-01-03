@@ -10,6 +10,8 @@
 #include <memory>
 #include <any>
 
+#include "utils/Utils.h"
+
 // EventBus for decoupled communication between components
 class EventBus
 {
@@ -44,7 +46,11 @@ private:
     static void callWithArgs(std::function<void(Args...)> callback, 
                            const std::vector<std::any>& args,
                            std::index_sequence<Is...>) {
-        callback(std::any_cast<Args>(args[Is])...);
+        try{
+            callback(std::any_cast<Args>(args[Is])...);
+        } catch (const std::bad_any_cast& e) {
+            LOG_ERROR("Failed to cast event arguments: %s", e.what());
+        }
     }
 
     std::unordered_map<std::string, std::vector<std::function<void(std::vector<std::any>)>>> events_;

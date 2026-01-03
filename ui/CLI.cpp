@@ -37,7 +37,7 @@ int CLI::exec() {
             break;
         }
         // Notify controller about user input
-        context_.eventBus.emit("controller::user-input", input);
+        context_.eventBus.emit("controller::user-input", input, std::vector<std::string>{});
     }
     return 0;
 }

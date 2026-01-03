@@ -6,7 +6,7 @@ class CLI : public UI
 {
 public:
     CLI(AppContext& context);
-    ~CLI() override {}
+    ~CLI() override;
     void onChatView_ShowMainMenu(const std::vector<ChatOption>& options) override;
     void onShowError(const std::string& errorMessage) override;
     void onShowInfo(const std::string& infoMessage) override;

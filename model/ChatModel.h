@@ -1,10 +1,12 @@
 #pragma once
 
+#include "common/typedef.h"
+
 class ChatModel
 {
 public:
-    ChatModel() = default;
-    ~ChatModel() = default;
+    ChatModel(AppContext& context);
+    ~ChatModel();
 
     ChatModel(ChatModel&&) = default;
     ChatModel& operator=(ChatModel&&) = default;

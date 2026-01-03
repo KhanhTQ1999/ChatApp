@@ -1,5 +1,5 @@
 #include <getopt.h>
-#include "services/ArgsParser.h"
+#include "ArgsParser.h"
 #include "utils/Utils.h"
 
 ArgsParser::ArgsParser(AppContext& context, int argc, char* argv[])
@@ -37,8 +37,6 @@ void ArgsParser::parseArgs(int argc, char* argv[])
     // Convert string to UIType enum
     if(uiTypeStr == "CLI"){
         uiType_ = UIType::CLI;
-    } else if(uiTypeStr == "WEB"){
-        uiType_ = UIType::WEB;
     } else if(uiTypeStr == "QT" || uiTypeStr == "Qt" || uiTypeStr == "qt"){
         uiType_ = UIType::QT;
     } else {
