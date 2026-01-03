@@ -1,57 +1,87 @@
 #include <iostream>
 #include <string>
-#include <getopt.h>
 #include <memory>
 
+#include "ui/UI.h"
+#include "ui/CLI.h"
+#include "utils/ArgsParser.h"
 #include "utils/Utils.h"
 #include "model/ChatModel.h"
 #include "controller/Controller.h"
 #include "views/ChatView.h"
-
-void printUsage(const char *argv){
-    std::cout << "Use: " << argv << std::endl;
-    std::cout << " [-h] [--help]: Print usage" << std::endl;
-    std::cout << " [-u] [--ui] <view type>: View type" << std::endl;
-    std::cout << "                   CLI: Commandline View." << std::endl;
-    std::cout << "                   WEB: WEB View." << std::endl;
-}
+#include "services/NetworkService.h"
 
 int main(int argc, char* argv[]) {
-    // Setup logger
-    // LOG_SET_LEVEL(LogLevel::INFO);
-    // LOG_SET_QUIET(false);
-
-    // Parse command line arguments
-    std::string uiType = "CLI"; // Default UI type
-    int opt;
-
-    static struct option longOpt[] = {
-        {"help", no_argument, 0, 'h'},
-        {"ui", required_argument, 0, 'u'},
-        {0, 0, 0, 0}
-    };
+    AppContext context;
+    ArgsParser argsParsr(context, argc, argv);
     
-    int longIdx = 0;
-    while ((opt = getopt_long(argc, argv, "hu:", longOpt, &longIdx)) != -1) {
-        switch (opt) {
-            case 'h':
-                printUsage(argv[0]);
-                return 0;
-            case 'u':
-                uiType = optarg;
-                break;
-            default:
-                LOG_ERROR("Try %s --help for more information", argv[0]);
-                return 1;
-        }
+    //Determine UI type
+    UIType uiType = argsParsr.getUIType();
+    std::unique_ptr<UI> ui = nullptr;
+    if(uiType == UIType::CLI){
+        ui = std::make_unique<CLI>();
+    }else if(uiType == UIType::QT){
+        LOG_ERROR("QT UI is not implemented yet.");
+        return 1;
+    }else{
+        LOG_ERROR("Only CLI UI is supported in this version.");
+        return 1;
+    }
+    
+    // Initialize MVC components
+    ChatModel chatModel(context);
+    ChatView chatView(context);
+    Controller controller(context, chatModel, chatView);
+
+    // Initialize services
+    NetworkService networkService(context);
+
+    // Connect event handlers
+    UI* uiPtr = ui.get();
+    Controller* ctrlPtr = &controller;
+    
+    //View to UI
+    context.eventBus.on<std::vector<ChatOption>>("ui::show-chat-menu", [uiPtr](const std::vector<ChatOption>& options){
+        uiPtr->onChatView_ShowMainMenu(options);
+    });
+
+    context.eventBus.on<std::string>("ui::show-error", [uiPtr](const std::string& options){
+        uiPtr->onShowError(options);
+    });
+
+    //UI to Controller
+    context.eventBus.on<std::string>("controller::user-input", [ctrlPtr](const std::string& input){
+        ctrlPtr->dispatchUserCommand(input);
+    });
+    
+    // Start the application
+    LOG_INFO("Starting ChatApp with UI type: %s", 
+             (uiType == UIType::CLI ? "CLI" : "QT"));
+    
+    if (!ui) {
+        LOG_ERROR("Failed to initialize UI");
+        return 1;
     }
 
-    //Initialize components
-    ChatModel chatModel;
-    ChatView chatView;
-    Controller controller(chatModel, chatView);
-
-    //Start application
     chatView.show();
+    
+    std::thread networkThread([&networkService, &context]() {
+        auto [code, msg] = networkService.startServer();
+        if (code != 0) {
+            LOG_ERROR("Failed to start server: %s", msg.c_str());
+            context.eventBus.emit("ui::show-error", "Failed to start network server: " + msg);
+        }else{
+            LOG_INFO("Network server started successfully");
+            context.eventBus.emit("ui::show-info", "Network server started successfully");
+        }
+    });
+
+    std::thread uiThread([&ui]() {
+        ui->exec();
+    });
+
+    networkThread.join();
+    uiThread.join();
+
     return 0;
 }
