@@ -47,8 +47,12 @@ int main(int argc, char* argv[]) {
         ui->onChatView_ShowMainMenu(options);
     }));
 
-    context.eventBus.on("ui::show-error", std::function<void(const std::string& options)>([&ui](const std::string& options){
+    context.eventBus.on("ui::show-error", std::function<void(const char* options)>([&ui](const char* options){
         ui->onShowError(options);
+    }));
+
+    context.eventBus.on("ui::show-info", std::function<void(const char* options)>([&ui](const char* options){
+        ui->onShowInfo(options);
     }));
 
     //UI to Controller
@@ -68,13 +72,10 @@ int main(int argc, char* argv[]) {
     chatView.show();
     
     std::thread networkThread([&networkService, &context]() {
-        auto [code, msg] = networkService.startServer();
+        auto [code, msg] = networkService.startServer("127.0.0.1", 5000);
         if (code != 0) {
             LOG_ERROR("Failed to start server: %s", msg.c_str());
             context.eventBus.emit("ui::show-error", "Failed to start network server: " + msg);
-        }else{
-            LOG_INFO("Network server started successfully");
-            context.eventBus.emit("ui::show-info", "Network server started successfully");
         }
     });
 

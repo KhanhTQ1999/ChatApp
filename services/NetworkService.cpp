@@ -1,5 +1,14 @@
-#include "services/NetworkService.h"
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include "common/RetryOperation.h"
 #include "utils/Utils.h"
+#include "services/NetworkService.h"
+
+#define BACKLOG 5
+#define BUF_SIZE 1024
+#define SV_SOCK_PATH "/tmp/server_socket"
 
 NetworkService::NetworkService(AppContext& context)
     : context_(context)
@@ -11,17 +20,86 @@ NetworkService::~NetworkService()
     // Cleanup resources if needed
 }
 
-std::pair<int, std::string> NetworkService::startServer()
+std::pair<int, std::string> NetworkService::startServer(const std::string& ipAddress, int startPort)
 {
-    // Placeholder implementation
-    LOG_INFO("Starting server at %s:%d", context_.ipAddress.c_str(), context_.port);
-    return {0, "Server started successfully"};
+    struct sockaddr_in addr;
+    int sfd, cfd;
+	char send_buff[1025];
+    ssize_t numRead;
+
+    sfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if(sfd < 0){
+        LOG_ERROR("Failed to create socket");
+        return {-1, "Failed to create socket"};
+    }
+
+    if(BindSocket(sfd, startPort) < 0){
+        LOG_ERROR("Failed to bind socket");
+        CloseSocket(sfd);
+        return {-1, "Failed to bind socket"};
+    }
+
+    if(listen(sfd, BACKLOG) < 0){
+        LOG_ERROR("Failed to listen on socket");
+        return {-1, "Failed to listen on socket"};
+    }
+
+    context_.eventBus.emit("ui::show-info", ("Server started on port " + ipAddress + ":" + std::to_string(startPort)).c_str());
+
+    while(getAppState() == AppState::Running)
+	{
+		/* In the call to accept(), the server is put to sleep and when for an incoming
+		 * client request, the three way TCP handshake* is complete, the function accept()
+		 * wakes up and returns the socket descriptor representing the client socket.
+		 */
+		cfd = accept(sfd, (struct sockaddr*)NULL, NULL);
+        if(cfd < 0){
+            if(errno == EWOULDBLOCK || errno == EAGAIN){
+                // No incoming connection, continue the loop
+                usleep(100); // Sleep for 100 microseconds to avoid busy waiting
+                continue;
+            } else {
+                LOG_ERROR("Failed to accept connection");
+                CloseSocket(sfd);
+                return {-1, "Failed to accept connection"};
+            }
+        }
+		/* As soon as server gets a request from client, it prepares the date and time and
+		 * writes on the client socket through the descriptor returned by accept()
+		 */
+		snprintf(send_buff, sizeof(send_buff), "Hello client from server\n");
+	}
+    return {0, ""};
+}
+
+int NetworkService::BindSocket(int& sfd, const int& startPort)
+{
+    int ret = pattern::retryOperation<int>([&sfd, &startPort](int32_t retriesLeft) {
+        struct sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        addr.sin_port = htons(startPort + (5 - retriesLeft)); // Try next port if in use
+
+        return bind(sfd, (struct sockaddr*)&addr, sizeof(addr));
+    }, 1000, 5);
+
+    return ret;
+}
+
+int NetworkService::CloseSocket(int& sfd)
+{
+    if (sfd >= 0) {
+        close(sfd);
+        sfd = -1;
+    }
+    return 0;
 }
 
 std::pair<int, std::string> NetworkService::stopServer()
 {
-    // Placeholder implementation
-    LOG_INFO("Stopping server at %s:%d", context_.ipAddress.c_str(), context_.port);
-    return {0, "Server stopped successfully"};
 }
 
+AppState NetworkService::getAppState()
+{
+    return context_.appState;
+}

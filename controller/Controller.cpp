@@ -97,6 +97,6 @@ void Controller::handleSendOption(const std::vector<std::string>& args) {
 }
 
 void Controller::handleExitOption() {
-    // TODO: Implement logic
     LOG_INFO("Exiting application as per user command.");
+    context_.appState = AppState::Stopped;
 }

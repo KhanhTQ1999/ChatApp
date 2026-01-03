@@ -9,7 +9,6 @@ namespace pattern
         public:
             static T& getInstance() {
                 std::call_once(initFlag_, []() {
-                    std::cout << "Singleton instance created." << std::endl;
                     instance_ = new T();
                 });
                 return *instance_;

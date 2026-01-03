@@ -19,25 +19,26 @@ void CLI::onChatView_ShowMainMenu(const std::vector<ChatOption>& options) {
     std::cout << "==========================================" << std::endl;
 }
 
-void CLI::onShowError(const std::string& errorMessage) {
+void CLI::onShowError(const char* errorMessage) {
     std::cerr << "Error: " << errorMessage << std::endl;
 }
 
-void CLI::onShowInfo(const std::string& infoMessage) {
+void CLI::onShowInfo(const char* infoMessage) {
     std::cout << "Info: " << infoMessage << std::endl;
 }
 
 int CLI::exec() {
     std::string input;
-    while (true) {
+    while (getAppState() == AppState::Running) {
         std::cout << "Enter command: ";
         std::getline(std::cin, input);
-        if (input == "exit") {
-            std::cout << "Exiting application. Goodbye!" << std::endl;
-            break;
-        }
+
         // Notify controller about user input
         context_.eventBus.emit("controller::user-input", input, std::vector<std::string>{});
     }
     return 0;
+}
+
+AppState CLI::getAppState() {
+    return context_.appState;
 }

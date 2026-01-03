@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -56,13 +57,6 @@ private:
     std::unordered_map<std::string, std::vector<std::function<void(std::vector<std::any>)>>> events_;
 };
 
-// Application context shared across components
-struct AppContext {
-    EventBus eventBus;
-    std::string ipAddress;
-    int port = 0;
-};
-
 struct ChatOption { 
     std::string action; 
     std::string description; 
@@ -72,4 +66,10 @@ struct ChatOption {
 enum class AppState : uint32_t {
     Running,
     Stopped
+};
+
+// Application context shared across components
+struct AppContext {
+    EventBus eventBus;
+    AppState appState = AppState::Running;
 };
