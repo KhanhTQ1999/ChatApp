@@ -3,9 +3,12 @@
 #include "common/typedef.h"
 #include "views/IView.h"
 
+// Forward declaration
+class ChatModel;
+
 class ChatView : public IView {
 public:
-    ChatView();
+    ChatView(AppContext& context);
     ~ChatView();
 
     ChatView(ChatView&&) = default;
@@ -13,14 +16,22 @@ public:
 
     void show() override;
     void hide() override;
-    void listenUser();
     void setHideShowState(bool state);
     bool getHideShowState();
+    
+    // Connect to model for observing changes
+    void connectToModel(ChatModel& model);
+    
+    // Display methods
+    void displayConnections();
+    void displayMessages();
+    void displayIPInfo(const std::string& ip, int port);
 
 private:
     void showMenu();
 
-    std::unordered_map <std::string, std::function<void(std::vector<std::string> args)>> cmdInfo_;
-    std::vector<std::string> cmndDesc_;
-    bool isShow_{true};
+    AppContext& context_;
+    ChatModel* model_ = nullptr;
+    std::vector<ChatOption> chatOption_;
+    bool isShow_{false};
 };
