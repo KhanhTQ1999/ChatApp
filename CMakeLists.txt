@@ -23,6 +23,7 @@ file(GLOB_RECURSE SOURCES
     ${PROJECT_SOURCE_DIR}/model/*.cpp
     ${PROJECT_SOURCE_DIR}/views/*.cpp
     ${PROJECT_SOURCE_DIR}/controller/*.cpp
+    ${PROJECT_SOURCE_DIR}/services/*.cpp
     ${PROJECT_SOURCE_DIR}/utils/*.cpp
     ${PROJECT_SOURCE_DIR}/main.cpp
 )
