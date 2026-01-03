@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
         auto [code, msg] = networkService.startServer("127.0.0.1", 5000);
         if (code != 0) {
             LOG_ERROR("Failed to start server: %s", msg.c_str());
-            context.eventBus.emit("ui::show-error", "Failed to start network server: " + msg);
+            context.eventBus.emit("ui::show-error", ("Failed to start network server: " + msg).c_str());
         }
     });
 

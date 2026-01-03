@@ -33,7 +33,7 @@ std::pair<int, std::string> NetworkService::startServer(const std::string& ipAdd
         return {-1, "Failed to create socket"};
     }
 
-    if(BindSocket(sfd, startPort) < 0){
+    if(BindSocket(sfd, ipAddress, startPort) < 0){
         LOG_ERROR("Failed to bind socket");
         CloseSocket(sfd);
         return {-1, "Failed to bind socket"};
@@ -44,7 +44,7 @@ std::pair<int, std::string> NetworkService::startServer(const std::string& ipAdd
         return {-1, "Failed to listen on socket"};
     }
 
-    context_.eventBus.emit("ui::show-info", ("Server started on port " + ipAddress + ":" + std::to_string(startPort)).c_str());
+    context_.eventBus.emit("ui::show-info", ("Server started on port " + context_.serverInfo.ip + ":" + std::to_string(context_.serverInfo.port)).c_str());
 
     while(getAppState() == AppState::Running)
 	{
@@ -72,18 +72,33 @@ std::pair<int, std::string> NetworkService::startServer(const std::string& ipAdd
     return {0, ""};
 }
 
-int NetworkService::BindSocket(int& sfd, const int& startPort)
+int NetworkService::BindSocket(int& sfd, const std::string& ipAddress, const int& startPort)
 {
-    int ret = pattern::retryOperation<int>([&sfd, &startPort](int32_t retriesLeft) {
+    int ret = pattern::retryOperation<int>([this, &sfd, &ipAddress, &startPort](int32_t retriesLeft) {
+        int ret;
+        int port = startPort + (5 - retriesLeft);
         struct sockaddr_in addr;
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        addr.sin_port = htons(startPort + (5 - retriesLeft)); // Try next port if in use
+        addr.sin_port = htons(port); // Try next port if in use
 
-        return bind(sfd, (struct sockaddr*)&addr, sizeof(addr));
+        ret = bind(sfd, (struct sockaddr*)&addr, sizeof(addr));
+        if (ret < 0) {
+            LOG_WARN("Bind failed on port %d, retries left: %d", ntohs(addr.sin_port), retriesLeft);
+            throw std::runtime_error("Bind failed");
+        }
+        this->updateServerInfo(ipAddress, port);
+        LOG_INFO("Successfully bound to port %d", ntohs(addr.sin_port));
+
+        return ret;
     }, 1000, 5);
 
     return ret;
+}
+
+void NetworkService::updateServerInfo(const std::string& ipAddress, int port) {
+    context_.serverInfo.ip = ipAddress;
+    context_.serverInfo.port = port;
 }
 
 int NetworkService::CloseSocket(int& sfd)

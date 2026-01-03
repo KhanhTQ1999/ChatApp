@@ -68,8 +68,14 @@ enum class AppState : uint32_t {
     Stopped
 };
 
+struct ServerInfo {
+    std::string ip;
+    int port;
+};
+
 // Application context shared across components
 struct AppContext {
     EventBus eventBus;
     AppState appState = AppState::Running;
+    ServerInfo serverInfo;
 };

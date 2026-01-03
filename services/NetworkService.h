@@ -18,8 +18,9 @@ public:
     std::pair<int, std::string> sendMessage(const std::string& ipAddress, int port, const std::string& message);
 
 private:
-    int BindSocket(int& sfd, const int& startPort);
+    int BindSocket(int& sfd, const std::string& ipAddress, const int& startPort);
     int CloseSocket(int& sfd);
+    void updateServerInfo(const std::string& ipAddress, int port);
     AppState getAppState();
 
     AppContext& context_;
