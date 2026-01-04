@@ -45,3 +45,7 @@ void ChatView::setHideShowState(bool state){
 bool ChatView::getHideShowState(){
     return isShow_;
 }
+
+void ChatView::displayConnections(const std::vector<int>& connectionIds) {
+    context_.eventBus.emit("ui::show-all-connections", connectionIds);
+}

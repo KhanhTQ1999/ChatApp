@@ -20,11 +20,11 @@ NetworkService::~NetworkService()
     // Cleanup resources if needed
 }
 
-std::pair<int, std::string> NetworkService::startServer(const std::string& ipAddress, int startPort)
+std::pair<int, std::string> NetworkService::startServer(const std::string ipAddress, int startPort)
 {
     struct sockaddr_in addr;
     int sfd, cfd;
-	char send_buff[1025];
+	char recv_buff[1024];
     ssize_t numRead;
 
     sfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -33,9 +33,9 @@ std::pair<int, std::string> NetworkService::startServer(const std::string& ipAdd
         return {-1, "Failed to create socket"};
     }
 
-    if(BindSocket(sfd, ipAddress, startPort) < 0){
+    if(bindSocket(sfd, ipAddress, startPort) < 0){
         LOG_ERROR("Failed to bind socket");
-        CloseSocket(sfd);
+        closeSocket(sfd);
         return {-1, "Failed to bind socket"};
     }
 
@@ -60,19 +60,27 @@ std::pair<int, std::string> NetworkService::startServer(const std::string& ipAdd
                 continue;
             } else {
                 LOG_ERROR("Failed to accept connection");
-                CloseSocket(sfd);
+                closeSocket(sfd);
                 return {-1, "Failed to accept connection"};
             }
+        }else{
+            cfdList_.push_back(cfd);
+            LOG_INFO("Accepted new connection, cfd: %d", cfd);
         }
 		/* As soon as server gets a request from client, it prepares the date and time and
 		 * writes on the client socket through the descriptor returned by accept()
 		 */
-		snprintf(send_buff, sizeof(send_buff), "Hello client from server\n");
+        for(int fd : cfdList_){
+            numRead = read(fd, recv_buff, BUF_SIZE);
+            if(numRead > 0){
+                LOG_INFO("Received message from cfd %d: %s", fd, recv_buff);
+            }
+        }
 	}
     return {0, ""};
 }
 
-int NetworkService::BindSocket(int& sfd, const std::string& ipAddress, const int& startPort)
+int NetworkService::bindSocket(int& sfd, const std::string& ipAddress, const int& startPort)
 {
     int ret = pattern::retryOperation<int>([this, &sfd, &ipAddress, &startPort](int32_t retriesLeft) {
         int ret;
@@ -101,7 +109,7 @@ void NetworkService::updateServerInfo(const std::string& ipAddress, int port) {
     context_.serverInfo.port = port;
 }
 
-int NetworkService::CloseSocket(int& sfd)
+int NetworkService::closeSocket(int& sfd)
 {
     if (sfd >= 0) {
         close(sfd);
@@ -110,11 +118,86 @@ int NetworkService::CloseSocket(int& sfd)
     return 0;
 }
 
-std::pair<int, std::string> NetworkService::stopServer()
-{
-}
-
 AppState NetworkService::getAppState()
 {
     return context_.appState;
 }
+
+std::pair<int, std::string> NetworkService::connectToPeer(std::string ipAddress, int port)
+{
+    int sfd = 0, n = 0;
+	char recvBuff[1024];
+	struct sockaddr_in serv_addr;
+
+    /* a socket is created through call to socket() function */
+    sfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(sfd < 0)
+	{
+		LOG_ERROR("Could not create socket");
+		return {-1, "Could not create socket"};
+	}
+
+    memset(&serv_addr, '0', sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(port);
+
+    /* Convert IPv4 and IPv6 addresses from text to binary form */
+	if(inet_pton(AF_INET, ipAddress.c_str(), &serv_addr.sin_addr)<=0)
+	{
+		LOG_ERROR("inet_pton error occurred");
+		return {-1, "inet_pton error occurred"};
+	}
+
+	/* Information like IP address of the remote host and its port is
+	 * bundled up in a structure and a call to function connect() is made
+	 * which tries to connect this socket with the socket (IP address and port)
+	 * of the remote host
+	 */
+	if(connect(sfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+	{
+		LOG_ERROR("Connect failed");
+		return {-1, "Connect failed"};
+	}
+
+    sfdList_.push_back(sfd);
+    LOG_INFO("Successfully connected to peer %s:%d", ipAddress.c_str(), port);
+    return {sfd, "Connected to peer " + ipAddress + ":" + std::to_string(port)};
+}
+
+std::pair<int, std::string> NetworkService::disconnectFromPeer(int sfdToDisconnect)
+{
+    auto it = std::find(sfdList_.begin(), sfdList_.end(), sfdToDisconnect);
+    if (it == sfdList_.end()) {
+        LOG_WARN("No active connection found for peer %d", sfdToDisconnect);
+        return {-1, "No active connection found"};
+    }
+
+    closeSocket(sfdToDisconnect);
+    sfdList_.erase(it);
+    LOG_INFO("Disconnected from peer %d", sfdToDisconnect);
+    return {0, ""};
+}
+
+std::pair<int, std::string> NetworkService::sendMessageToPeer(int sfdToSend, const std::string& message)
+{
+    auto it = std::find(sfdList_.begin(), sfdList_.end(), sfdToSend);
+    if(it == sfdList_.end()){
+        LOG_WARN("No active connection found for peer %d", sfdToSend);
+        return {-1, "No active connection found"};
+    }
+
+    ssize_t bytesSent = send(sfdToSend, message.c_str(), message.size(), 0);
+    if(bytesSent < 0){
+        LOG_ERROR("Failed to send message to %d", sfdToSend);
+        return {-1, "Failed to send message"};
+    }else{
+        LOG_INFO("Sent message to %d", sfdToSend);
+        return {0, "Sent message to " + std::to_string(sfdToSend)};
+    }
+}
+
+std::vector<int> NetworkService::getActiveConnections()
+{
+    return sfdList_;
+}
+

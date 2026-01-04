@@ -35,7 +35,7 @@ std::pair<std::string, std::vector<std::string>> Controller::parseInput(std::str
     return {command, args};
 }
 
-void Controller::dispatchUserCommand(const std::string cmd, const std::vector<std::string> args) {
+void Controller::dispatchUserCommand(const std::string& cmd, const std::vector<std::string>& args) {
     auto it = dispatcher_.find(cmd);
     if (it != dispatcher_.end()) {
         it->second(args);
@@ -52,50 +52,63 @@ void Controller::handleHelpOption() {
 
 // Show the current IP address of the application
 void Controller::handleMyIPOption() {
-    // TODO: Implement logic to retrieve and display local IP
     LOG_INFO("MyIP option selected");
+    context_.eventBus.emit("ui::show-info", ("Current IP: " + context_.serverInfo.ip).c_str());
 }
 
 // Show the current port number of the application
 void Controller::handleMyPortOption() {
-    // TODO: Implement logic to retrieve and display local port
     LOG_INFO("MyPort option selected");
+    context_.eventBus.emit("ui::show-info", ("Current Port: " + std::to_string(context_.serverInfo.port)).c_str());
 }
 
 // Connect to a peer using host and port arguments
 void Controller::handleConnectOption(const std::vector<std::string>& args) {
-    // TODO: Implement logic to connect to a peer
-    LOG_INFO("Connect to peer");
-    for(const auto& arg : args){
-        LOG_INFO("Arg: %s", arg.c_str());
+    if(args.size() != 2){
+        LOG_ERROR("Connect command requires 2 arguments: <host> <port>");
+        context_.eventBus.emit("ui::show-error", "Connect command requires 2 arguments: <host> <port>");
+        return;
     }
+
+    std::string host = args[0];
+    int port = std::stoi(args[1]);
+
+    context_.eventBus.emit("network::connect-to-peer", host, port);
 }
 
 // List all active peer connections
 void Controller::handleListOption() {
-    // TODO: Implement logic to list all current connections
     LOG_INFO("List all connections");
-
+    context_.eventBus.emit("network::list-active-connections");
 }
 
 // Terminate a connection by its ID
 void Controller::handleTerminateOption(const std::vector<std::string>& args) {
-    // TODO: Implement logic to terminate a connection
-    LOG_INFO("Terminate connection id");
-    for(const auto& arg : args){
-        LOG_INFO("Arg: %s", arg.c_str());
+    if (args.size() != 1) {
+        LOG_ERROR("Terminate command requires 1 arguments: <connection_id>");
+        context_.eventBus.emit("ui::show-error", "Terminate command requires 1 arguments: <connection_id>");
+        return;
     }
+
+    int connectionId = std::stoi(args[0]);
+    context_.eventBus.emit("network::disconnect-from-peer", connectionId);
 }
 
 // Send a message to a peer by connection ID
 void Controller::handleSendOption(const std::vector<std::string>& args) {
-    // TODO: Implement logic
-    LOG_INFO("Sending message to connection id");
-    for(const auto& arg : args){
-        LOG_INFO("Arg: %s", arg.c_str());
+    if (args.size() != 2) {
+        LOG_ERROR("Send command requires 2 arguments: <connection_id> <message>");
+        context_.eventBus.emit("ui::show-error", "Send command requires 2 arguments: <connection_id> <message>");
+        return;
     }
+
+    int connectionId = std::stoi(args[0]);
+    std::string message = args[1];
+
+    context_.eventBus.emit("network::send-to-peer", connectionId, message);
 }
 
+// Exit the application gracefully
 void Controller::handleExitOption() {
     LOG_INFO("Exiting application as per user command.");
     context_.appState = AppState::Stopped;

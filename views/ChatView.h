@@ -23,7 +23,7 @@ public:
     void connectToModel(ChatModel& model);
     
     // Display methods
-    void displayConnections();
+    void displayConnections(const std::vector<int>& connectionIds);
     void displayMessages();
     void displayIPInfo(const std::string& ip, int port);
 

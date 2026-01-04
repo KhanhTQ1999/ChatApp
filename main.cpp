@@ -42,11 +42,34 @@ int main(int argc, char* argv[]) {
     UI* uiPtr = ui.get();
     Controller* ctrlPtr = &controller;
     
+    //MVC to Services
+    context.eventBus.on("network::connect-to-peer", std::function<void(std::string, int)>([&networkService](std::string ip, int port){
+        networkService.connectToPeer(ip, port);
+    }));
+
+    context.eventBus.on("network::send-to-peer", std::function<void(int, const std::string&)>([&networkService](int connectionId, const std::string& message){
+        networkService.sendMessageToPeer(connectionId, message);
+    }));
+
+    context.eventBus.on("network::disconnect-from-peer", std::function<void(int)>([&networkService](int connectionId){
+        networkService.disconnectFromPeer(connectionId);
+    }));
+
+    context.eventBus.on("network::list-active-connections", std::function<void()>([&networkService, &chatView](){
+        std::vector<int> sfdList = networkService.getActiveConnections();
+        chatView.displayConnections(sfdList);
+    }));
+
     //View to UI
     context.eventBus.on("ui::show-chat-menu", std::function<void(const std::vector<ChatOption>&)>([&ui](const std::vector<ChatOption>& options){
         ui->onChatView_ShowMainMenu(options);
     }));
 
+    context.eventBus.on("ui::show-all-connections", std::function<void(const std::vector<int>&)>([&ui](const std::vector<int>& connectionIds){
+        ui->onChatView_ShowAllConnections(connectionIds);
+    }));
+
+    //Any to UI
     context.eventBus.on("ui::show-error", std::function<void(const char* options)>([&ui](const char* options){
         ui->onShowError(options);
     }));
@@ -56,7 +79,7 @@ int main(int argc, char* argv[]) {
     }));
 
     //UI to Controller
-    context.eventBus.on("controller::user-input", std::function<void(const std::string& input, const std::vector<std::string> args)>([ctrlPtr](const std::string& input, const std::vector<std::string> args){
+    context.eventBus.on("controller::user-input", std::function<void(const std::string& input, const std::vector<std::string>& args)>([ctrlPtr](const std::string& input, const std::vector<std::string>& args){
         ctrlPtr->dispatchUserCommand(input, args);
     }));
     

@@ -13,7 +13,7 @@ public:
     Controller(Controller&&) = default;
     Controller& operator=(Controller&&) = default;
 
-    void dispatchUserCommand(const std::string cmd, const std::vector<std::string> args);
+    void dispatchUserCommand(const std::string& cmd, const std::vector<std::string>& args);
 private:
     // Input parsing and dispatch
     std::pair<std::string, std::vector<std::string>> parseInput(std::string& input);
