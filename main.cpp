@@ -38,11 +38,7 @@ int main(int argc, char* argv[]) {
     // Initialize services
     NetworkService networkService(context);
 
-    // Connect event handlers
-    UI* uiPtr = ui.get();
-    Controller* ctrlPtr = &controller;
-    
-    //MVC to Services
+    // Connect MVC -> Services event to handlers
     context.eventBus.on("network::connect-to-peer", std::function<void(std::string, int)>([&networkService](std::string ip, int port){
         networkService.connectToPeer(ip, port);
     }));
@@ -60,7 +56,7 @@ int main(int argc, char* argv[]) {
         chatView.displayConnections(sfdList);
     }));
 
-    //View to UI
+    // Connect View -> UI event to handlers
     context.eventBus.on("ui::show-chat-menu", std::function<void(const std::vector<ChatOption>&)>([&ui](const std::vector<ChatOption>& options){
         ui->onChatView_ShowMainMenu(options);
     }));
@@ -69,7 +65,7 @@ int main(int argc, char* argv[]) {
         ui->onChatView_ShowAllConnections(connectionIds);
     }));
 
-    //Any to UI
+    // Connect anyone -> UI event to handlers
     context.eventBus.on("ui::show-error", std::function<void(const char* options)>([&ui](const char* options){
         ui->onShowError(options);
     }));
@@ -78,9 +74,9 @@ int main(int argc, char* argv[]) {
         ui->onShowInfo(options);
     }));
 
-    //UI to Controller
-    context.eventBus.on("controller::user-input", std::function<void(const std::string& input, const std::vector<std::string>& args)>([ctrlPtr](const std::string& input, const std::vector<std::string>& args){
-        ctrlPtr->dispatchUserCommand(input, args);
+    // Connect UI -> Controller event to handlers
+    context.eventBus.on("controller::user-input", std::function<void(const std::string& input, const std::vector<std::string>& args)>([&controller](const std::string& input, const std::vector<std::string>& args){
+        controller.dispatchUserCommand(input, args);
     }));
     
     // Start the application
