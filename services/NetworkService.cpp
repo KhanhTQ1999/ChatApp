@@ -54,16 +54,16 @@ std::pair<int, std::string> NetworkService::startServer(const std::string ipAddr
 		 */
 		cfd = accept(sfd, (struct sockaddr*)NULL, NULL);
         if(cfd < 0){
-            if(errno == EWOULDBLOCK || errno == EAGAIN){
-                // No incoming connection, continue the loop
-                usleep(100); // Sleep for 100 microseconds to avoid busy waiting
-                continue;
-            } else {
+            if(errno != EWOULDBLOCK && errno != EAGAIN){
                 LOG_ERROR("Failed to accept connection");
                 closeSocket(sfd);
                 return {-1, "Failed to accept connection"};
             }
         }else{
+            struct timeval timeout = {0, 100000}; // 100 milliseconds timeout
+            if (setsockopt(cfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+                LOG_ERROR("Error setting socket options: %d", errno);
+            }
             cfdList_.push_back(cfd);
             LOG_INFO("Accepted new connection, cfd: %d", cfd);
         }
@@ -71,11 +71,14 @@ std::pair<int, std::string> NetworkService::startServer(const std::string ipAddr
 		 * writes on the client socket through the descriptor returned by accept()
 		 */
         for(int fd : cfdList_){
-            numRead = read(fd, recv_buff, BUF_SIZE);
+            memset(recv_buff, 0, sizeof(recv_buff));
+            numRead = recv(fd, recv_buff, BUF_SIZE, 0);
             if(numRead > 0){
                 LOG_INFO("Received message from cfd %d: %s", fd, recv_buff);
             }
         }
+
+        usleep(100000); // Sleep for 100ms to prevent busy waiting
 	}
     return {0, ""};
 }
