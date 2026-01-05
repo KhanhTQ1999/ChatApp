@@ -96,14 +96,20 @@ void Controller::handleTerminateOption(const std::vector<std::string>& args) {
 
 // Send a message to a peer by connection ID
 void Controller::handleSendOption(const std::vector<std::string>& args) {
-    if (args.size() != 2) {
+    if (args.size() < 2) {
         LOG_ERROR("Send command requires 2 arguments: <connection_id> <message>");
         context_.eventBus.emit("ui::show-error", "Send command requires 2 arguments: <connection_id> <message>");
         return;
     }
 
     int connectionId = std::stoi(args[0]);
-    std::string message = args[1];
+    std::string message;
+    for(int i = 1; i < args.size(); i++) {
+        if(i > 1) {
+            message += " ";
+        }
+        message += args[i];
+    }
 
     context_.eventBus.emit("network::send-to-peer", connectionId, message);
 }
