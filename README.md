@@ -8,7 +8,37 @@ ChatApp is a small peer-to-peer console chat application written in C++ (C++17) 
 - Provide a learning example for networking, multithreading, and CMake-based C++ projects.
 - Be usable for small LAN chat experiments and debugging practice in VS Code.
 
-## 3. Get the code, build and debug
+## 3. Stack Software
+![Stack Software diagram](docs/StackSoftware.png)
+
+Source diagram: [docs/StackSoftware.drawio](docs/StackSoftware.drawio)
+
+Stack diagram description
+- UI layer
+  - Contains the user-facing interfaces (Command-line UI, optional Qt UI, etc.).
+  - Responsible for presenting messages and accepting user commands (connect, send, list, terminate, etc.).
+  - Forwards parsed commands as events to the Controller.
+
+- MVC layer
+  - View: Renders UI and displays updates; collects user input.
+  - Controller: Interprets user commands, orchestrates actions, invokes services, and updates the Model.
+  - Model: To do.
+
+- Services layer
+  - Network / Connection Service: Manages TCP listeners, outgoing connections, per-connection handlers, message send/receive and reconnection logic.
+
+- System Libraries
+  - Uses POSIX sockets and pthreads (or std::thread) through the C++ standard library interfaces.
+  - Low-level networking here.
+
+Data flow (high-level)
+1. User types a command in the UI.
+2. UI/View sends the command to Controller.
+3. Controller validates and updates Model or calls Services (e.g., NetworkService::connect or send).
+4. Network Service performs socket operations (listener, send/receive) on background threads.
+5. Incoming network events are routed back to View for display.
+
+## 4. Get the code, build and debug
 
 Prerequisites
 - Linux (development tested on Ubuntu)
@@ -68,7 +98,7 @@ Configure CMake extension & debug in VS Code
 ```
 4. Use the CMake status bar in VS Code to configure and build, then launch the debug configuration.
 
-## 4. Usage guideline (commands / options)
+## 5. Usage guideline (commands / options)
 When the app runs it exposes a console UI. Common commands:
 - help — show help text
 - myip — show local IP address
@@ -84,7 +114,7 @@ Notes
 - `connect` can be used to create a symmetric conversation (both peers can connect to each other).
 - Use `myport` to learn which port the local listener is using if the app chooses one dynamically
 
-## 5. Example session
+## 6. Example session
 
 Host A (start listener)
 ```sh
