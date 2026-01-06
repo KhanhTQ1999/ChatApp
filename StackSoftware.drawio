@@ -1,0 +1,52 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" version="29.2.9">
+  <diagram name="Page-1" id="1NzlzHgD5WaomcszEoSR">
+    <mxGraphModel dx="1426" dy="751" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-19" parent="1" style="rounded=0;whiteSpace=wrap;html=1;glass=0;portConstraintRotation=0;fillColor=#ffe6cc;strokeColor=#d79b00;" value="" vertex="1">
+          <mxGeometry height="410" width="760" x="40" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;fillColor=#FF99FF;strokeColor=light-dark(#ff00f7, #ffacac);fontColor=#ffffff;" value="&lt;h2 style=&quot;margin: 0 0 0 40px; border: none; padding: 0px;&quot;&gt;UI&lt;/h2&gt;" vertex="1">
+          <mxGeometry height="110" width="680" x="80" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="&lt;h3&gt;Command line&lt;/h3&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="230" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="&lt;h3&gt;QT&lt;/h3&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="410" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="&lt;h3&gt;...&lt;/h3&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="590" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;fillColor=#FFB366;strokeColor=light-dark(#ff8800, #9db395);fontColor=#ffffff;" value="&lt;h2 style=&quot;margin: 0 0 0 40px; border: none; padding: 0px;&quot;&gt;MVC&lt;/h2&gt;" vertex="1">
+          <mxGeometry height="110" width="680" x="80" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;fillColor=#FF6666;strokeColor=#B20000;fontColor=#ffffff;" value="&lt;blockquote style=&quot;margin: 0 0 0 40px; border: none; padding: 0px;&quot;&gt;&lt;h2&gt;Services&lt;/h2&gt;&lt;/blockquote&gt;" vertex="1">
+          <mxGeometry height="110" width="680" x="80" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="&lt;h3&gt;View&lt;/h3&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="230" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="&lt;h3&gt;Controller&lt;/h3&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="410" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="&lt;h3&gt;Model&lt;/h3&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="590" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="&lt;h3&gt;Network&lt;/h3&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="230" y="335" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-17" connectable="0" parent="1" style="group;rounded=0;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="" vertex="1">
+          <mxGeometry height="110" width="760" x="40" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-10" parent="HPB2T1AC0n46j4_cpHJ_-17" style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=#d5e8d4;strokeColor=#82b366;" value="&lt;blockquote style=&quot;margin: 0 0 0 40px; border: none; padding: 0px;&quot;&gt;&lt;h2&gt;System Lib&lt;/h2&gt;&lt;/blockquote&gt;" vertex="1">
+          <mxGeometry height="110" width="760" as="geometry" />
+        </mxCell>
+        <mxCell id="HPB2T1AC0n46j4_cpHJ_-16" parent="HPB2T1AC0n46j4_cpHJ_-17" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="&lt;h3&gt;Socket&lt;/h3&gt;" vertex="1">
+          <mxGeometry height="60" width="134.11764705882354" x="179.99705882352941" y="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
