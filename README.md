@@ -156,3 +156,22 @@ Shutdown
 Troubleshooting
 - Inspect build logs in `build/` (compile_commands.json or CMakeFiles) for compilation issues.
 - Use the VS Code debugger to set breakpoints and step through networking code.
+
+## 7. Pattern
+- MVC: separates presentation, control logic and application state.
+  - Benefits:
+    - Improves maintainability by isolating UI changes from business logic.
+    - Makes testing easier (controllers and models can be unit tested independent of view).
+    - Enables multiple UI front-ends (CLI, Qt) to reuse the same Controller/Model.
+
+- Singleton: single instances for shared services (e.g., Logger, NetworkManager).
+  - Benefits:
+    - Ensures a single source of truth for shared resources (consistent logging, centralized network state).
+    - Simplifies access to global services without passing references through many layers.
+    - Reduces resource duplication (single network manager, single configuration object).
+
+- Retry / Backoff: used by network-related operations for reconnect attempts.
+  - Benefits:
+    - Improves network robustness by handling transient failures automatically.
+    - Avoids tight retry loops that can overload network or remote peers.
+    - Makes recovery predictable and configurable (max attempts, exponential backoff).
