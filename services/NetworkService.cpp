@@ -22,10 +22,32 @@ NetworkService::~NetworkService()
 
 std::pair<int, std::string> NetworkService::startServer(const std::string ipAddress, int startPort)
 {
+    try{
+        std::pair<int, std::string> ret = createServer(ipAddress, startPort);
+        int sfd = ret.first;
+        if (sfd < 0) {
+            return {-1, "Failed to create socket server"};
+        }
+
+        context_.eventBus.emit("ui::show-info", ("Server started on port " + context_.serverInfo.ip + ":" + std::to_string(context_.serverInfo.port)).c_str());
+
+        while(getAppState() == AppState::Running)
+        {
+            ret = expectNewClient(sfd);
+            listenClientMessages();
+            usleep(100000); // Sleep for 100ms to prevent busy waiting
+        }
+        return {0, ""};
+    } catch (const std::exception& e) {
+        LOG_ERROR("Exception in startServer: %s", e.what());
+        return {-1, "Exception occurred: " + std::string(e.what())};
+    }
+}
+
+std::pair<int, std::string> NetworkService::createServer(const std::string& ipAddress, int startPort)
+{
     struct sockaddr_in addr;
-    int sfd, cfd;
-	char recv_buff[1024];
-    ssize_t numRead;
+    int sfd;
 
     sfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if(sfd < 0){
@@ -43,44 +65,39 @@ std::pair<int, std::string> NetworkService::startServer(const std::string ipAddr
         LOG_ERROR("Failed to listen on socket");
         return {-1, "Failed to listen on socket"};
     }
-
-    context_.eventBus.emit("ui::show-info", ("Server started on port " + context_.serverInfo.ip + ":" + std::to_string(context_.serverInfo.port)).c_str());
-
-    while(getAppState() == AppState::Running)
-	{
-		/* In the call to accept(), the server is put to sleep and when for an incoming
-		 * client request, the three way TCP handshake* is complete, the function accept()
-		 * wakes up and returns the socket descriptor representing the client socket.
-		 */
-		cfd = accept(sfd, (struct sockaddr*)NULL, NULL);
-        if(cfd < 0){
-            if(errno != EWOULDBLOCK && errno != EAGAIN){
-                LOG_ERROR("Failed to accept connection");
-                closeSocket(sfd);
-                return {-1, "Failed to accept connection"};
-            }
-        }else{
-            struct timeval timeout = {0, 100000}; // 100 milliseconds timeout
-            if (setsockopt(cfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
-                LOG_ERROR("Error setting socket options: %d", errno);
-            }
-            cfdList_.push_back(cfd);
-            LOG_INFO("Accepted new connection, cfd: %d", cfd);
+    return {sfd, ""};
+}
+std::pair<int, std::string> NetworkService::expectNewClient(int sfd)
+{
+    int cfd = accept(sfd, (struct sockaddr*)NULL, NULL);
+    if(cfd < 0){
+        if(errno != EWOULDBLOCK && errno != EAGAIN){
+            LOG_ERROR("Failed to accept connection");
+            closeSocket(sfd);
+            return {-1, "Failed to accept connection"};
         }
-		/* As soon as server gets a request from client, it prepares the date and time and
-		 * writes on the client socket through the descriptor returned by accept()
-		 */
-        for(int fd : cfdList_){
-            memset(recv_buff, 0, sizeof(recv_buff));
-            numRead = recv(fd, recv_buff, BUF_SIZE, 0);
-            if(numRead > 0){
-                LOG_INFO("Received message from cfd %d: %s", fd, recv_buff);
-            }
+    }else{
+        struct timeval timeout = {0, 100000}; // 100 milliseconds timeout
+        if (setsockopt(cfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+            LOG_ERROR("Error setting socket options: %d", errno);
         }
-
-        usleep(100000); // Sleep for 100ms to prevent busy waiting
-	}
+        cfdList_.push_back(cfd);
+        LOG_INFO("Accepted new connection, cfd: %d", cfd);
+    }
     return {0, ""};
+}
+
+void NetworkService::listenClientMessages()
+{
+    char recv_buff[1024];
+    ssize_t numRead;
+    for(int fd : cfdList_){
+        memset(recv_buff, 0, sizeof(recv_buff));
+        numRead = recv(fd, recv_buff, BUF_SIZE, 0);
+        if(numRead > 0){
+            LOG_INFO("Received message from cfd %d: %s", fd, recv_buff);
+        }
+    }
 }
 
 int NetworkService::bindSocket(int& sfd, const std::string& ipAddress, const int& startPort)

@@ -23,6 +23,9 @@ private:
     int closeSocket(int& sfd);
     void updateServerInfo(const std::string& ipAddress, int port);
     AppState getAppState();
+    void listenClientMessages();
+    std::pair<int, std::string> expectNewClient(int sfd);
+    std::pair<int, std::string> createServer(const std::string& ipAddress, int startPort);
 
     AppContext& context_;
     std::vector<int> cfdList_; //Client list. Use for receiving messages from peers
