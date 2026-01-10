@@ -26,8 +26,13 @@ private:
     void listenClientMessages();
     std::pair<int, std::string> expectNewClient(int sfd);
     std::pair<int, std::string> createServer(const std::string& ipAddress, int startPort);
+    void configureNewConnection(int& cfd);
+    void handleNewConnection(int& cfd);
+    int findMaxCfd();
 
     AppContext& context_;
     std::vector<int> cfdList_; //Client list. Use for receiving messages from peers
     std::vector<int> sfdList_; //Server list. Use for sending messages to peers
+    fd_set readFds_;
+    int cfdMax_;
 };

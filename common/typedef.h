@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <memory>
 #include <any>
+#include <climits>
 
 #include "utils/Utils.h"
 

@@ -11,7 +11,7 @@
 #define SV_SOCK_PATH "/tmp/server_socket"
 
 NetworkService::NetworkService(AppContext& context)
-    : context_(context)
+    : context_(context), cfdMax_(0)
 {
     // Initialize network service with context if needed
 }
@@ -77,27 +77,72 @@ std::pair<int, std::string> NetworkService::expectNewClient(int sfd)
             return {-1, "Failed to accept connection"};
         }
     }else{
-        struct timeval timeout = {0, 100000}; // 100 milliseconds timeout
-        if (setsockopt(cfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
-            LOG_ERROR("Error setting socket options: %d", errno);
-        }
-        cfdList_.push_back(cfd);
+        configureNewConnection(cfd);
+        handleNewConnection(cfd);
         LOG_INFO("Accepted new connection, cfd: %d", cfd);
     }
     return {0, ""};
 }
 
+void NetworkService::configureNewConnection(int& cfd){
+    struct timeval timeout = {0, 100000}; // 100 milliseconds timeout
+    if (setsockopt(cfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+        LOG_ERROR("Error setting socket options: %d", errno);
+    }
+}
+
+void NetworkService::handleNewConnection(int& cfd){
+    cfdList_.push_back(cfd);
+    FD_SET(cfd, &readFds_);
+    cfdMax_ = findMaxCfd();
+}
+
+int NetworkService::findMaxCfd(){
+    int maxCfd = INT_MIN;
+    for(auto cfd : cfdList_)
+    {
+        maxCfd = std::max(maxCfd, cfd);
+    }
+    return maxCfd;
+}
+
 void NetworkService::listenClientMessages()
 {
-    char recv_buff[1024];
-    ssize_t numRead;
+    // char recv_buff[1024];
+    // ssize_t numRead;
+    // for(int fd : cfdList_){
+    //     memset(recv_buff, 0, sizeof(recv_buff));
+    //     numRead = recv(fd, recv_buff, BUF_SIZE, 0);
+    //     if(numRead > 0){
+    //         LOG_INFO("Received message from cfd %d: %s", fd, recv_buff);
+    //     }
+    // }
+    if(cfdList_.empty()){
+        return;
+    }
+    struct timeval timeout{0, 100000}; // 100 milliseconds timeout
+    FD_ZERO(&readFds_);
     for(int fd : cfdList_){
-        memset(recv_buff, 0, sizeof(recv_buff));
-        numRead = recv(fd, recv_buff, BUF_SIZE, 0);
-        if(numRead > 0){
-            LOG_INFO("Received message from cfd %d: %s", fd, recv_buff);
+        FD_SET(fd, &readFds_);
+    }
+    int ready = select(cfdMax_ + 1, &readFds_, NULL, NULL, &timeout);
+    if (ready < 0) {
+        LOG_ERROR("Error in select");
+    }else if (ready == 0) {
+        // Timeout occurred, no data to read
+    } else {
+        for (int fd : cfdList_) {
+            if (FD_ISSET(fd, &readFds_)) {
+                char recv_buff[BUF_SIZE];
+                memset(recv_buff, 0, sizeof(recv_buff));
+                ssize_t numRead = recv(fd, recv_buff, BUF_SIZE, 0);
+                if (numRead > 0) {
+                    LOG_INFO("Received message from cfd %d: %s", fd, recv_buff);
+                }
+            }
         }
     }
+
 }
 
 int NetworkService::bindSocket(int& sfd, const std::string& ipAddress, const int& startPort)
@@ -194,6 +239,7 @@ std::pair<int, std::string> NetworkService::disconnectFromPeer(int sfdToDisconne
 
     closeSocket(sfdToDisconnect);
     sfdList_.erase(it);
+    cfdMax_ = findMaxCfd();
     LOG_INFO("Disconnected from peer %d", sfdToDisconnect);
     return {0, ""};
 }
